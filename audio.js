@@ -305,7 +305,9 @@ class AudioSystem {
             // パンニングノードを追加
             if (this.audioContext.createStereoPanner && Math.abs(pan) > 0.01) {
                 const pannerNode = this.audioContext.createStereoPanner();
-                pannerNode.pan.value = pan;
+                // パンニング値を[-1.0, 1.0]の範囲にクランプ（安全対策）
+                const clampedPan = Math.max(-1.0, Math.min(1.0, pan));
+                pannerNode.pan.value = clampedPan;
                 mainGain.connect(pannerNode);
                 pannerNode.connect(this.masterGain);
             } else {
@@ -488,7 +490,9 @@ class AudioSystem {
             // パンニングノードを追加
             if (this.audioContext.createStereoPanner && Math.abs(pan) > 0.01) {
                 const pannerNode = this.audioContext.createStereoPanner();
-                pannerNode.pan.value = pan;
+                // パンニング値を[-1.0, 1.0]の範囲にクランプ（安全対策）
+                const clampedPan = Math.max(-1.0, Math.min(1.0, pan));
+                pannerNode.pan.value = clampedPan;
                 mainGain.connect(pannerNode);
                 pannerNode.connect(this.masterGain);
             } else {

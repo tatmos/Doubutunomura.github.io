@@ -710,10 +710,22 @@ body {
     pointer-events: auto;
     transition: transform var(--transition-fast);
     animation: bobble 2s ease-in-out infinite;
+    user-select: none;
 }
 
 .character:hover {
     transform: scale(1.1);
+}
+
+.character[data-dragging="true"] {
+    animation: none !important;
+    transition: none !important;
+    cursor: grabbing !important;
+    z-index: 1000;
+}
+
+.character:active {
+    transform: scale(1.15);
 }
 
 .character.befriended {

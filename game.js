@@ -253,6 +253,8 @@ class Game {
         this.state.wolfDefeated = false;
         // 裏モード2章用の盗まれた音名をリセット・生成
         if (chapterNum === 7) {
+            // 7章では全ての音名を忘れた状態にする（いたずら子猫に盗まれたため）
+            this.state.learnedNotes = [];
             // 章開始時に盗まれた音名を生成
             const chapter = CHAPTERS[chapterNum];
             if (chapter && chapter.randomHideNoteNames && chapter.availableNotes) {
@@ -261,6 +263,8 @@ class Game {
             } else {
                 this.state.stolenNoteNames = null;
             }
+            // デバッグログカウンターをリセット
+            this._shouldShowNoteNameLogCount = 0;
         } else {
             // 他の章ではリセット
             this.state.stolenNoteNames = null;
@@ -617,7 +621,53 @@ class Game {
         const chapterData = CHAPTER_CHARACTERS[this.state.currentChapter];
         if (!chapterData) return;
         
-        chapterData.cats.forEach(cat => {
+        // キャラクターの位置情報を先に収集（重なり検出用）
+        const positions = [];
+        chapterData.cats.forEach((cat, index) => {
+            let x = cat.position.x;
+            let y = cat.position.y;
+            
+            // 重なり検出と自動調整
+            const overlapThreshold = 8; // パーセンテージでの重なり閾値
+            let adjusted = false;
+            let attempts = 0;
+            const maxAttempts = 20; // 無限ループ防止
+            
+            while (!adjusted && attempts < maxAttempts) {
+                let hasOverlap = false;
+                for (let i = 0; i < positions.length; i++) {
+                    const other = positions[i];
+                    const dx = Math.abs(x - other.x);
+                    const dy = Math.abs(y - other.y);
+                    
+                    if (dx < overlapThreshold && dy < overlapThreshold) {
+                        hasOverlap = true;
+                        // 重なっている場合、右または下にずらす
+                        if (x < 80) {
+                            x = Math.min(other.x + overlapThreshold, 85);
+                        } else {
+                            x = Math.max(other.x - overlapThreshold, 5);
+                        }
+                        if (y < 75) {
+                            y = Math.min(other.y + overlapThreshold, 80);
+                        } else {
+                            y = Math.max(other.y - overlapThreshold, 45);
+                        }
+                        break;
+                    }
+                }
+                
+                if (!hasOverlap) {
+                    adjusted = true;
+                }
+                attempts++;
+            }
+            
+            positions.push({ x, y });
+        });
+        
+        // キャラクターの要素を全て作成
+        chapterData.cats.forEach((cat, index) => {
             const charElement = document.createElement('div');
             charElement.className = 'character';
             charElement.dataset.id = cat.id;
@@ -633,16 +683,18 @@ class Game {
                 charElement.classList.add('escaped');
             }
             
-            charElement.style.left = `${cat.position.x}%`;
-            charElement.style.top = `${cat.position.y}%`;
+            // 調整済み位置を設定
+            const pos = positions[index];
+            charElement.style.left = `${pos.x}%`;
+            charElement.style.top = `${pos.y}%`;
             
             // うろうろアニメーション（狂った猫たち）
             if (cat.wobbleAnimation && !isFriend) {
                 charElement.classList.add('wobbling');
                 // 初期位置をCSS変数として設定
-                charElement.style.setProperty('--wobble-start', `${cat.position.x}%`);
+                charElement.style.setProperty('--wobble-start', `${pos.x}%`);
                 // 初期位置を記録（パンニング用）
-                charElement.dataset.baseX = cat.position.x;
+                charElement.dataset.baseX = pos.x;
             }
             
             const sprite = document.createElement('div');
@@ -660,14 +712,93 @@ class Game {
             charElement.appendChild(sprite);
             charElement.appendChild(status);
             
+            // ドラッグ機能を追加
+            this.setupCharacterDrag(charElement, cat, isFriend);
+            
             // 仲間になっていない猫はクリック可能（逃げた猫も再挑戦可能）
             if (!isFriend) {
-                charElement.addEventListener('click', () => {
-                    this.startDialogue(cat, hasEscaped);
+                charElement.addEventListener('click', (e) => {
+                    // ドラッグ中でない場合のみクリックイベントを処理
+                    if (!charElement.dataset.dragging) {
+                        this.startDialogue(cat, hasEscaped);
+                    }
                 });
             }
             
             this.elements.charactersContainer.appendChild(charElement);
+        });
+    }
+    
+    setupCharacterDrag(charElement, cat, isFriend) {
+        let isDragging = false;
+        let startX = 0;
+        let startY = 0;
+        let startLeft = 0;
+        let startTop = 0;
+        
+        charElement.addEventListener('mousedown', (e) => {
+            // 仲間になった猫もドラッグ可能
+            isDragging = true;
+            charElement.dataset.dragging = 'true';
+            charElement.style.zIndex = '1000';
+            charElement.style.cursor = 'grabbing';
+            
+            startX = e.clientX;
+            startY = e.clientY;
+            startLeft = parseFloat(charElement.style.left) || 0;
+            startTop = parseFloat(charElement.style.top) || 0;
+            
+            e.preventDefault();
+            e.stopPropagation();
+        });
+        
+        document.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+            
+            const containerRect = this.elements.charactersContainer.getBoundingClientRect();
+            const containerWidth = containerRect.width;
+            const containerHeight = containerRect.height;
+            
+            const deltaX = e.clientX - startX;
+            const deltaY = e.clientY - startY;
+            
+            // パーセンテージに変換
+            const deltaXPercent = (deltaX / containerWidth) * 100;
+            const deltaYPercent = (deltaY / containerHeight) * 100;
+            
+            let newX = startLeft + deltaXPercent;
+            let newY = startTop + deltaYPercent;
+            
+            // 境界チェック（画面外に出ないように）
+            newX = Math.max(0, Math.min(95, newX));
+            newY = Math.max(40, Math.min(85, newY));
+            
+            charElement.style.left = `${newX}%`;
+            charElement.style.top = `${newY}%`;
+            
+            // うろうろアニメーションを一時的に無効化
+            if (charElement.classList.contains('wobbling')) {
+                charElement.classList.remove('wobbling');
+                charElement.style.setProperty('--wobble-start', `${newX}%`);
+                charElement.dataset.baseX = newX;
+            }
+        });
+        
+        document.addEventListener('mouseup', () => {
+            if (isDragging) {
+                isDragging = false;
+                delete charElement.dataset.dragging;
+                charElement.style.zIndex = '';
+                charElement.style.cursor = 'pointer';
+                
+                // うろうろアニメーションを再開
+                if (cat.wobbleAnimation && !isFriend) {
+                    const currentX = parseFloat(charElement.style.left) || 0;
+                    charElement.classList.add('wobbling');
+                    charElement.style.setProperty('--wobble-start', `${currentX}%`);
+                    charElement.dataset.baseX = currentX;
+                }
+            }
         });
     }
     
@@ -801,6 +932,8 @@ class Game {
      * キャラクターの位置からパンニング値を計算（-1.0: 左端, 0: 中央, 1.0: 右端）
      */
     getCharacterPan(character) {
+        let pan = 0;
+        
         // 対話画面でのうろうろアニメーション中の場合
         if (this.state.currentScreen === 'dialogue' && character.wobbleAnimation && this.state.currentChapter === 6) {
             // アニメーションの進行状況に基づいてパンニングを計算
@@ -808,20 +941,46 @@ class Game {
             const now = Date.now();
             const phase = (now % 3000) / 3000; // 0-1の範囲
             // サイン波で左右に動く
-            return Math.sin(phase * Math.PI * 2) * 0.6; // -0.6から0.6の範囲
+            pan = Math.sin(phase * Math.PI * 2) * 0.6; // -0.6から0.6の範囲
+        } else {
+            // 村画面でのうろうろ中
+            const charElement = document.querySelector(`.character[data-id="${character.id}"]`);
+            if (charElement && character.wobbleAnimation) {
+                const computedStyle = window.getComputedStyle(charElement);
+                const leftValue = computedStyle.left;
+                
+                // パーセンテージ（例："25%"）またはピクセル値（例："100px"）を処理
+                let leftPercent;
+                if (leftValue.includes('%')) {
+                    // パーセンテージ値の場合
+                    leftPercent = parseFloat(leftValue);
+                } else if (leftValue.includes('px')) {
+                    // ピクセル値の場合は親要素の幅で割ってパーセンテージに変換
+                    const parentWidth = charElement.parentElement?.offsetWidth || window.innerWidth;
+                    const leftPx = parseFloat(leftValue);
+                    leftPercent = (leftPx / parentWidth) * 100;
+                } else {
+                    leftPercent = parseFloat(leftValue) || 50;
+                }
+                
+                if (!isNaN(leftPercent) && leftPercent >= 0 && leftPercent <= 100) {
+                    // パーセンテージ値を-1.0から1.0の範囲に変換
+                    // 0% → -1.0, 50% → 0.0, 100% → 1.0
+                    pan = (leftPercent / 50.0) - 1.0;
+                } else {
+                    // 無効な値の場合は初期位置を使用
+                    const x = character.position.x || 50;
+                    pan = (x / 50.0) - 1.0;
+                }
+            } else {
+                // 通常の場合は初期位置から計算
+                const x = character.position.x || 50;
+                pan = (x / 50.0) - 1.0;
+            }
         }
         
-        // 村画面でのうろうろ中
-        const charElement = document.querySelector(`.character[data-id="${character.id}"]`);
-        if (charElement && character.wobbleAnimation) {
-            const computedStyle = window.getComputedStyle(charElement);
-            const leftPercent = parseFloat(computedStyle.left);
-            return (leftPercent / 50.0) - 1.0;
-        }
-        
-        // 通常の場合は初期位置から計算
-        const x = character.position.x || 50;
-        return (x / 50.0) - 1.0;
+        // 範囲を[-1.0, 1.0]にクランプ
+        return Math.max(-1.0, Math.min(1.0, pan));
     }
     
     async playAndShowNotes() {
