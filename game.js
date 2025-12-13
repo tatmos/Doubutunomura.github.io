@@ -195,16 +195,32 @@ class Game {
     renderChapterList() {
         this.elements.chapterList.innerHTML = '';
         
-        for (let i = 1; i <= 5; i++) {
+        // 裏モード（6章）が解放されているかチェック
+        const secretModeUnlocked = this.state.completedChapters.includes(5);
+        const maxChapter = secretModeUnlocked ? 6 : 5;
+        
+        for (let i = 1; i <= maxChapter; i++) {
             const chapter = CHAPTERS[i];
-            const isUnlocked = i === 1 || this.state.completedChapters.includes(i - 1);
+            if (!chapter) continue;
+            
+            let isUnlocked;
+            if (i === 1) {
+                isUnlocked = true;
+            } else if (i === 6) {
+                // 裏モードは5章クリア後に解放
+                isUnlocked = secretModeUnlocked;
+            } else {
+                isUnlocked = this.state.completedChapters.includes(i - 1);
+            }
+            
             const isCompleted = this.state.completedChapters.includes(i);
+            const isSecret = chapter.isSecretMode;
             
             const item = document.createElement('div');
-            item.className = `chapter-item ${isUnlocked ? '' : 'locked'} ${isCompleted ? 'completed' : ''}`;
+            item.className = `chapter-item ${isUnlocked ? '' : 'locked'} ${isCompleted ? 'completed' : ''} ${isSecret ? 'secret' : ''}`;
             
             item.innerHTML = `
-                <div class="chapter-number">${i}</div>
+                <div class="chapter-number">${isSecret ? '🎭' : i}</div>
                 <div class="chapter-info">
                     <div class="chapter-title">${chapter.title}</div>
                     <div class="chapter-description">${chapter.description}</div>
@@ -499,6 +515,15 @@ class Game {
             charElement.style.left = `${cat.position.x}%`;
             charElement.style.top = `${cat.position.y}%`;
             
+            // うろうろアニメーション（狂った猫たち）
+            if (cat.wobbleAnimation && !isFriend) {
+                charElement.classList.add('wobbling');
+                // 初期位置をCSS変数として設定
+                charElement.style.setProperty('--wobble-start', `${cat.position.x}%`);
+                // 初期位置を記録（パンニング用）
+                charElement.dataset.baseX = cat.position.x;
+            }
+            
             const sprite = document.createElement('div');
             sprite.className = 'character-sprite';
             sprite.textContent = cat.emoji;
@@ -584,6 +609,9 @@ class Game {
         if (character.isTwin) return 'twin';
         if (character.isFast) return 'cat_energetic';
         
+        // 狂った猫は特別な音声タイプ
+        if (character.isCrazy) return 'cat_energetic';
+        
         // 個性に応じた音声タイプ
         const personalityMap = {
             'シンプル': 'cat',
@@ -610,10 +638,33 @@ class Game {
             'オペラ歌手': 'cat_energetic',
             'シャープ好き': 'cat',
             '半音双子': 'twin',
-            '指揮者猫': 'witch'
+            '指揮者猫': 'witch',
+            '狂気': 'cat_energetic',
+            '宇宙': 'witch',
+            '半魚人': 'cat',
+            '神秘': 'witch',
+            '奇妙': 'cat_energetic'
         };
         
         return personalityMap[character.personality] || 'cat';
+    }
+    
+    /**
+     * キャラクターの位置からパンニング値を計算（-1.0: 左端, 0: 中央, 1.0: 右端）
+     */
+    getCharacterPan(character) {
+        // キャラクター要素を取得（うろうろ中は現在位置）
+        const charElement = document.querySelector(`.character[data-id="${character.id}"]`);
+        if (charElement && character.wobbleAnimation) {
+            // うろうろ中の場合は現在の位置を取得
+            const computedStyle = window.getComputedStyle(charElement);
+            const leftPercent = parseFloat(computedStyle.left);
+            // 0%を-1.0、50%を0、100%を1.0にマッピング
+            return (leftPercent / 50.0) - 1.0;
+        }
+        // 通常の場合は初期位置から計算
+        const x = character.position.x || 50;
+        return (x / 50.0) - 1.0;
     }
     
     async playAndShowNotes() {
@@ -626,11 +677,16 @@ class Game {
             await this.playTwinNotes();
         } else {
             // 通常：1つのメロディを再生
+            // うろうろアニメーション中は各音ごとにパンニングを再計算
+            const dynamicPan = character.wobbleAnimation;
+            
             for (const note of this.state.targetNotes) {
                 const bubble = this.createNoteBubble(note);
                 this.elements.animalNotes.appendChild(bubble);
                 
-                await audioSystem.playNote(note, character.tempo * 0.8, character.type || 'cat');
+                // パンニングを適用（動的な場合は毎回計算）
+                const pan = dynamicPan ? this.getCharacterPan(character) : this.getCharacterPan(character);
+                await audioSystem.playNote(note, character.tempo * 0.8, character.type || 'cat', pan);
                 await this.delay(character.tempo * 200);
             }
         }
@@ -643,6 +699,7 @@ class Game {
         const notes1 = this.state.targetNotes;
         const notes2 = this.state.twinTargetNotes;
         const maxLength = Math.max(notes1.length, notes2.length);
+        const dynamicPan = character.wobbleAnimation;
         
         for (let i = 0; i < maxLength; i++) {
             const chord = [];
@@ -661,7 +718,9 @@ class Game {
                 this.elements.animalNotes.appendChild(bubble2);
             }
             
-            await audioSystem.playChord(chord, character.tempo * 0.8, 'cat');
+            // パンニングを適用（動的な場合は毎回計算）
+            const pan = dynamicPan ? this.getCharacterPan(character) : this.getCharacterPan(character);
+            await audioSystem.playChord(chord, character.tempo * 0.8, 'cat', pan);
             await this.delay(character.tempo * 200);
         }
     }
@@ -1038,16 +1097,20 @@ class Game {
         wolfEl.textContent = chapterData.wolf.emoji;
         this.elements.endingAnimals.appendChild(wolfEl);
         
+        // 章ごとのエンディングテキストを表示
+        const endingText = STORY.ending[this.state.currentChapter] || STORY.ending[1];
+        this.elements.endingText.innerHTML = endingText.replace(/\n/g, '<br>');
+        
         // 次の章があるかチェック
         const nextChapterBtn = document.getElementById('next-chapter-btn');
         if (this.state.currentChapter < 5) {
             nextChapterBtn.style.display = 'inline-block';
-            this.elements.endingText.innerHTML = 
-                'あなたのおかげで、<br>どうぶつの村に平和が戻りました。<br><br>次の章へ進もう！';
-        } else {
+        } else if (this.state.currentChapter === 5) {
+            // 5章クリア後は裏モードが解放される
             nextChapterBtn.style.display = 'none';
-            this.elements.endingText.innerHTML = 
-                '全ての章をクリアしました！<br><br>あなたは真の音楽家です。<br>どうぶつたちは永遠にあなたを忘れないでしょう...';
+        } else {
+            // 6章（裏モード）クリア後
+            nextChapterBtn.style.display = 'none';
         }
         
         await this.delay(2000);

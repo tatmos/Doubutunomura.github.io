@@ -284,9 +284,10 @@ class AudioSystem {
     }
     
     /**
-     * 単音を再生（ピアノ音色対応）
+     * 単音を再生（ピアノ音色対応 + パンニング対応）
+     * @param {number} pan - パンニング値（-1.0: 左, 0: 中央, 1.0: 右）
      */
-    playNote(note, duration = 0.4, character = 'player') {
+    playNote(note, duration = 0.4, character = 'player', pan = 0) {
         return new Promise((resolve) => {
             if (!this.isInitialized || !this.frequencies[note]) {
                 resolve();
@@ -299,7 +300,16 @@ class AudioSystem {
             
             // メインゲインノード
             const mainGain = this.audioContext.createGain();
-            mainGain.connect(this.masterGain);
+            
+            // パンニングノードを追加
+            if (this.audioContext.createStereoPanner && Math.abs(pan) > 0.01) {
+                const pannerNode = this.audioContext.createStereoPanner();
+                pannerNode.pan.value = pan;
+                mainGain.connect(pannerNode);
+                pannerNode.connect(this.masterGain);
+            } else {
+                mainGain.connect(this.masterGain);
+            }
             
             const oscillators = [];
             
@@ -460,9 +470,10 @@ class AudioSystem {
     }
     
     /**
-     * 複数の音を同時に再生（和音）- ピアノ音色対応
+     * 複数の音を同時に再生（和音）- ピアノ音色対応 + パンニング対応
+     * @param {number} pan - パンニング値（-1.0: 左, 0: 中央, 1.0: 右）
      */
-    playChord(notes, duration = 0.5, character = 'cat') {
+    playChord(notes, duration = 0.5, character = 'cat', pan = 0) {
         return new Promise((resolve) => {
             if (!this.isInitialized) {
                 resolve();
@@ -472,7 +483,16 @@ class AudioSystem {
             const instrument = this.instruments[character] || this.instruments.cat;
             const now = this.audioContext.currentTime;
             const mainGain = this.audioContext.createGain();
-            mainGain.connect(this.masterGain);
+            
+            // パンニングノードを追加
+            if (this.audioContext.createStereoPanner && Math.abs(pan) > 0.01) {
+                const pannerNode = this.audioContext.createStereoPanner();
+                pannerNode.pan.value = pan;
+                mainGain.connect(pannerNode);
+                pannerNode.connect(this.masterGain);
+            } else {
+                mainGain.connect(this.masterGain);
+            }
             
             const allOscillators = [];
             

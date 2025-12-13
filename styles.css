@@ -412,6 +412,33 @@ body {
     margin-left: 5px;
 }
 
+.chapter-item.secret {
+    background: linear-gradient(135deg, rgba(139, 107, 74, 0.1), rgba(74, 58, 126, 0.1));
+    border: 3px solid rgba(255, 215, 0, 0.5);
+    box-shadow: 0 0 20px rgba(255, 215, 0, 0.2);
+}
+
+.chapter-item.secret:hover:not(.locked) {
+    border-color: var(--color-accent-gold);
+    box-shadow: 0 5px 30px rgba(255, 215, 0, 0.5);
+    transform: translateX(10px) scale(1.02);
+}
+
+.chapter-item.secret .chapter-number {
+    animation: secretPulse 2s ease-in-out infinite;
+}
+
+@keyframes secretPulse {
+    0%, 100% { 
+        transform: scale(1);
+        text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+    }
+    50% { 
+        transform: scale(1.1);
+        text-shadow: 0 0 20px rgba(255, 215, 0, 0.8);
+    }
+}
+
 /* ============================================
    オープニング画面
    ============================================ */
@@ -696,6 +723,26 @@ body {
 .character.escaped {
     opacity: 0.6;
     filter: grayscale(50%);
+}
+
+/* うろうろアニメーション（狂った猫たち） */
+.character.wobbling {
+    animation: wobble 3s ease-in-out infinite, bobble 2s ease-in-out infinite;
+}
+
+@keyframes wobble {
+    0%, 100% {
+        left: var(--wobble-start, 25%);
+    }
+    25% {
+        left: calc(var(--wobble-start, 25%) + 5%);
+    }
+    50% {
+        left: var(--wobble-start, 25%);
+    }
+    75% {
+        left: calc(var(--wobble-start, 25%) - 5%);
+    }
 }
 
 .character.escaped:hover {

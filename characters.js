@@ -65,6 +65,21 @@ const CHAPTERS = {
         hasFastCat: true,
         hasWitchCat: true,
         availableNotes: ['do', 'do#', 're', 're#', 'mi', 'fa', 'fa#', 'so', 'so#', 'la', 'la#', 'ti']
+    },
+    6: {
+        id: 6,
+        title: '裏モード：狂気の調べ',
+        subtitle: '全ての音を使いこなせ',
+        description: '最初から12音すべてが使える！狂った猫たちが待っている...',
+        unlocked: false,  // 5章クリア後に解放
+        hideNoteNames: false,  // 最初から全部表示
+        randomizePhrases: true,
+        hasBlackKeys: true,
+        hasTwins: true,
+        hasFastCat: true,
+        hasWitchCat: true,
+        isSecretMode: true,  // 裏モードフラグ
+        availableNotes: ['do', 'do#', 're', 're#', 'mi', 'fa', 'fa#', 'so', 'so#', 'la', 'la#', 'ti']
     }
 };
 
@@ -575,6 +590,118 @@ const CHAPTER_CHARACTERS = {
             }
         ],
         wolf: createWolf(5)
+    },
+    
+    // ===== 裏モード：狂気の調べ =====
+    6: {
+        cats: [
+            {
+                id: 'cat_kyojin',
+                name: '狂人猫',
+                type: 'cat',
+                emoji: '😵',
+                personality: '狂気',
+                isCrazy: true,  // 狂った鳴き声フラグ
+                description: '狂ったような鳴き声を発する猫',
+                position: { x: 25, y: 55 },
+                phrases: [['do', 're#', 'fa#', 'ti', 'do#', 'la']],  // 不規則な音列
+                currentPhrase: 0,
+                tempo: 0.35,
+                difficulty: 6,
+                wobbleAnimation: true,  // うろうろアニメーション
+                dialogue: {
+                    greeting: 'ギャオオオオ！ニャニャニャニャ！\n（狂ったような鳴き声が響く...）',
+                    success: 'ニャ〜♡♡♡♡\n（すごくデレデレになってきた！めちゃくちゃ甘えたがってる！）',
+                    failure: 'ギャオオ...！\n（さらに狂気が増した...）',
+                    retry: 'ニャニャ...♡\n（もう一度話しかけてくれた...嬉しい...）'
+                }
+            },
+            {
+                id: 'cat_uchuu',
+                name: '宇宙猫',
+                type: 'witch',
+                emoji: '👽',
+                personality: '宇宙',
+                isCrazy: true,
+                description: '宇宙から来た猫のようなもの',
+                position: { x: 50, y: 60 },
+                phrases: [['do#', 'mi', 'fa#', 'la#', 're', 'so#', 'ti']],
+                currentPhrase: 0,
+                tempo: 0.4,
+                difficulty: 6,
+                wobbleAnimation: true,
+                dialogue: {
+                    greeting: 'ピピピ...ビービー...プププ...\n（宇宙のような音を出している...）',
+                    success: 'ピピピ♡♡♡♡♡♡\n（宇宙から来た猫は最高にデレデレになった！すりすりしてくる！）',
+                    failure: 'ピピ...？\n（困惑した音を発して消えた...）',
+                    retry: 'ピピ♡...？\n（戻ってきた...もしかして寂しかった？）'
+                }
+            },
+            {
+                id: 'cat_hangyojin',
+                name: '半魚人猫',
+                type: 'cat',
+                emoji: '🧜‍♀️',
+                personality: '半魚人',
+                isCrazy: true,
+                description: '半魚人と猫が合体したような存在',
+                position: { x: 35, y: 70 },
+                phrases: [['re#', 'fa', 'so#', 'la#', 'do', 'mi', 'fa#']],
+                currentPhrase: 0,
+                tempo: 0.38,
+                difficulty: 6,
+                wobbleAnimation: true,
+                dialogue: {
+                    greeting: 'ブクブク...ニャブクブク...\n（水中のような泡の音と猫の鳴き声が混じっている...）',
+                    success: 'ブク♡ブク♡♡♡♡♡\n（半魚人猫が最高にデレデレになった！めちゃくちゃ甘えたがってる！）',
+                    failure: 'ブクブク...\n（泡の中に消えていった...）',
+                    retry: 'ブク♡...？\n（戻ってきた...もっと話したい？）'
+                }
+            },
+            {
+                id: 'cat_shinpi',
+                name: '神秘猫',
+                type: 'witch',
+                emoji: '🔮',
+                personality: '神秘',
+                isCrazy: true,
+                description: '神秘的な力を持つ狂気の猫',
+                position: { x: 70, y: 50 },
+                phrases: [['ti', 'la#', 'fa#', 'do#', 're#', 'so#', 'mi']],
+                currentPhrase: 0,
+                tempo: 0.35,
+                difficulty: 7,
+                wobbleAnimation: true,
+                dialogue: {
+                    greeting: 'フワフワ...ニャオオオオ...\n（神秘的で狂ったような音が響く...）',
+                    success: 'フワ♡♡♡♡♡♡♡\n（神秘猫が最高にデレデレになった！魔法のように甘えたがってる！）',
+                    failure: 'フワ...？\n（煙とともに消えた...）',
+                    retry: 'フワ♡...？\n（再び現れた...あなたを待っていた...）'
+                }
+            },
+            {
+                id: 'cat_kimyo',
+                name: '奇妙猫',
+                type: 'cat',
+                emoji: '🎭',
+                personality: '奇妙',
+                isCrazy: true,
+                description: '奇妙な動きをする狂気の猫',
+                position: { x: 15, y: 65 },
+                phrases: [['do', 'fa#', 're#', 'la#', 'so#', 'mi', 'ti', 'do#']],
+                currentPhrase: 0,
+                tempo: 0.32,
+                difficulty: 7,
+                wobbleAnimation: true,
+                dialogue: {
+                    greeting: 'キョロキョロ...ニャニャニャニャ...\n（奇妙で狂ったような鳴き声...）',
+                    success: 'ニャ♡♡♡♡♡♡♡♡♡\n（奇妙猫が最高にデレデレになった！めちゃくちゃ甘えたがってる！）',
+                    failure: 'キョロ...？\n（不気味に消えていった...）',
+                    retry: 'ニャ♡...？\n（戻ってきた...あなたが好きなのかも...）'
+                }
+            }
+        ],
+        wolf: createWolf(6)  // 裏モード用の狼も作成
     }
 };
 
@@ -706,7 +833,7 @@ function createWolf(chapter) {
                 tempo: 0.35
             }
         ],
-        5: [
+                5: [
             {
                 emotion: 'angry',
                 phrases: [['do', 'do#', 're', 're#', 'mi']],
@@ -724,6 +851,41 @@ function createWolf(chapter) {
                 phrases: [['do', 're', 'mi', 'fa', 'fa#', 'so', 'so#', 'la', 'la#', 'ti']],
                 dialogue: { intro: 'ワン！ワン！', challenge: 'ウォーン♪（全ての音！）', success: 'ワオーーン！！（完璧だ！！）', failure: 'クゥン...' },
                 tempo: 0.35
+            }
+        ],
+        6: [
+            {
+                emotion: 'angry',
+                phrases: [['do#', 'mi', 'fa#', 'la#', 're', 'so#']],
+                dialogue: { 
+                    intro: 'グルルル...！！（狂気の音が響く...）', 
+                    challenge: 'ガウッ！全ての音をまねろ！', 
+                    success: 'グル...♪（驚いている...）', 
+                    failure: 'ガウウウ！！（さらに狂気が増した...）' 
+                },
+                tempo: 0.3
+            },
+            {
+                emotion: 'calm',
+                phrases: [['re#', 'fa', 'so#', 'la#', 'do', 'mi', 'fa#', 'ti']],
+                dialogue: { 
+                    intro: 'ウォーン...（神秘的な音が響く）', 
+                    challenge: 'クゥーン...（複雑な調べ...）', 
+                    success: 'ウォン！（認めた！）', 
+                    failure: 'グルル...（まだまだ...）' 
+                },
+                tempo: 0.32
+            },
+            {
+                emotion: 'happy',
+                phrases: [['do', 'do#', 're', 're#', 'mi', 'fa', 'fa#', 'so', 'so#', 'la', 'la#', 'ti']],
+                dialogue: { 
+                    intro: 'ワン！ワン！（全ての音を使える！）', 
+                    challenge: 'ウォーン♪（全ての12音を奏でろ！）', 
+                    success: 'ワオーーン！！（完璧だ！！最高の音楽家だ！！）', 
+                    failure: 'クゥン...（もう少し...！）' 
+                },
+                tempo: 0.3
             }
         ]
     };
@@ -756,19 +918,22 @@ const STORY = {
     ],
     
     chapterIntros: {
-        1: '第1章へようこそ！\n村の猫たちと音であいさつしてみましょう。',
-        2: '第2章へようこそ！\n今度は音の名前がわかりません。\n耳をすませて覚えていきましょう。',
-        3: '第3章へようこそ！\n双子の猫が現れます！\n同時に聞こえる2つの音を聞き分けましょう。',
-        4: '第4章へようこそ！\n早口猫や魔女猫が登場！\n速さや長さに挑戦しましょう。',
-        5: '最終章へようこそ！\nシ♭やファ#など、新しい音も登場します。\n全ての音をマスターしましょう！'
+        1: '第1章へようこそ！\n村の猫たちと音であいさつしてみましょう。\nシンプルな音から始まります。',
+        2: '第2章へようこそ！\n今度は音の名前がわかりません。\n耳をすませて覚えていきましょう。\n新しい音との出会いが待っています。',
+        3: '第3章へようこそ！\n双子の猫が現れます！\n同時に聞こえる2つの音を聞き分けましょう。\n和音の美しさを感じてください。',
+        4: '第4章へようこそ！\n早口猫や魔女猫が登場！\n速さや長さに挑戦しましょう。\n個性豊かな仲間たちが待っています。',
+        5: '最終章へようこそ！\nシ♭やファ#など、新しい音も登場します。\n全ての音をマスターしましょう！\nこれは最後の試練です。',
+        6: '裏モードへようこそ！\n全ての音が最初から使えます。\n狂気に満ちた猫たちが待っています...\n彼らは最初は狂ったように見えますが、\n仲間になると驚くほどデレデレになります。'
     },
     
-    ending: [
-        'ガルムは、ずっとさみしかったのです。',
-        '村のみんなとあなたのおかげで、',
-        'ガルムの心にも平和が戻りました。',
-        'これからは、みんなで仲良く暮らせるでしょう...'
-    ]
+    ending: {
+        1: 'ガルムは、ずっとさみしかったのです。\n村のみんなとあなたのおかげで、\nガルムの心にも平和が戻りました。\nこれからは、みんなで仲良く暮らせるでしょう...',
+        2: 'ガルムは、もっと多くの音を知りたかったのです。\nあなたが教えてくれた音たちが、\nガルムの心を満たしてくれました。\n音楽の世界は広がり続けます...',
+        3: 'ガルムは、双子の猫たちに興味を持っていました。\nあなたが奏でたハーモニーが、\nガルムの孤独を癒してくれました。\nこれからは、みんなで一緒に歌えるでしょう...',
+        4: 'ガルムは、個性豊かな猫たちに憧れていました。\nあなたがすべての個性を受け入れたように、\nガルムも自分自身を受け入れられるようになりました。\n多様性の美しさを感じています...',
+        5: 'ガルムは、全ての音を聞きたかったのです。\nあなたが奏でた12音すべてが、\nガルムの心を満たしてくれました。\nこれで音楽の世界は完成です...\n\n（裏モードが解放されました！）',
+        6: '狂気に満ちていた猫たちも、\nあなたの音楽で心を開きました。\n最初は狂ったように見えた彼らも、\n本当はただ甘えたかっただけだったのです。\n\n全ての音をマスターしたあなたは、\n真の音楽家となりました。\nどうぶつたちは永遠にあなたを忘れないでしょう...'
+    }
 };
 
 // ヘルパー関数
