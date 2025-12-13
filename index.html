@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>どうぶつの村 〜音の絆〜</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@400;700;900&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div id="game-container">
+        <!-- 音声設定ボタン -->
+        <div id="audio-controls">
+            <button id="speech-toggle" class="btn-icon-small" title="読み上げON/OFF">🔊</button>
+        </div>
+
+        <!-- タイトル画面 -->
+        <div id="title-screen" class="screen active">
+            <div class="stars"></div>
+            <div class="title-content">
+                <h1 class="game-title">どうぶつの村</h1>
+                <p class="subtitle">〜音の絆〜</p>
+                <div class="title-decoration">
+                    <span class="note">♪</span>
+                    <span class="note">♫</span>
+                    <span class="note">♪</span>
+                </div>
+                <button id="chapter-select-btn" class="btn-primary">章を選んで遊ぶ</button>
+            </div>
+        </div>
+
+        <!-- 章選択画面 -->
+        <div id="chapter-select-screen" class="screen">
+            <div class="chapter-bg"></div>
+            <div class="chapter-select-content">
+                <h2 class="chapter-select-title">章を選択</h2>
+                <div id="chapter-list" class="chapter-list">
+                    <!-- JavaScriptで動的に生成 -->
+                </div>
+                <button id="back-to-title-btn" class="btn-secondary">もどる</button>
+            </div>
+        </div>
+
+        <!-- オープニング画面 -->
+        <div id="opening-screen" class="screen">
+            <div class="opening-bg"></div>
+            <div class="story-box">
+                <p id="story-text"></p>
+                <div class="story-controls">
+                    <button id="skip-story-btn" class="btn-text">スキップ</button>
+                    <button id="next-story-btn" class="btn-secondary">つぎへ</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 村のマップ画面 -->
+        <div id="village-screen" class="screen">
+            <div class="village-bg">
+                <div class="sky"></div>
+                <div class="sun"></div>
+                <div class="clouds">
+                    <div class="cloud cloud1"></div>
+                    <div class="cloud cloud2"></div>
+                    <div class="cloud cloud3"></div>
+                </div>
+                <div class="ground"></div>
+                <div class="trees">
+                    <div class="tree tree1"></div>
+                    <div class="tree tree2"></div>
+                    <div class="tree tree3"></div>
+                </div>
+                <div class="forest-entrance">
+                    <div class="dark-forest"></div>
+                    <span class="forest-label">深い森へ...</span>
+                </div>
+            </div>
+            <div id="characters-container"></div>
+            <div id="village-ui">
+                <div class="chapter-indicator">
+                    <span id="current-chapter-name">第1章</span>
+                </div>
+                <div class="friend-counter">
+                    <span class="friend-icon">🐱</span>
+                    <span id="friend-count">0</span> / <span id="total-cats">5</span>
+                </div>
+                <div class="learned-notes" id="learned-notes-display">
+                    <!-- 覚えた音符を表示 -->
+                </div>
+                <div class="message-box" id="village-message">
+                    村のなかまたちに あいさつしよう！
+                </div>
+            </div>
+        </div>
+
+        <!-- 対話画面 -->
+        <div id="dialogue-screen" class="screen">
+            <div class="dialogue-bg"></div>
+            <div class="character-display">
+                <div id="animal-sprite" class="animal-sprite"></div>
+                <div id="animal-name" class="animal-name"></div>
+            </div>
+            <div class="dialogue-box">
+                <p id="dialogue-text"></p>
+            </div>
+            <div class="music-display">
+                <div id="animal-notes" class="notes-display">
+                    <!-- どうぶつの音符が表示される -->
+                </div>
+                <div class="vs-divider">
+                    <span>♪ あなたの番 ♪</span>
+                </div>
+                <div id="player-notes" class="notes-display player">
+                    <!-- プレイヤーの入力が表示される -->
+                </div>
+            </div>
+            <div id="piano-keyboard" class="piano">
+                <!-- JavaScriptで動的に生成 -->
+            </div>
+            <div class="dialogue-controls">
+                <button id="replay-btn" class="btn-icon" title="もういちど聞く">🔊</button>
+                <button id="clear-btn" class="btn-icon" title="クリア">✖</button>
+                <button id="submit-btn" class="btn-primary">こたえる！</button>
+            </div>
+        </div>
+
+        <!-- 結果画面 -->
+        <div id="result-screen" class="screen">
+            <div id="result-content">
+                <div id="result-animal" class="result-animal"></div>
+                <h2 id="result-title"></h2>
+                <p id="result-message"></p>
+                <div id="learned-note-display" class="learned-note-popup"></div>
+                <button id="continue-btn" class="btn-primary">つづける</button>
+            </div>
+        </div>
+
+        <!-- 狼との対話画面 -->
+        <div id="wolf-screen" class="screen">
+            <div class="wolf-bg">
+                <div class="dark-sky"></div>
+                <div class="moon"></div>
+                <div class="dark-trees"></div>
+            </div>
+            <div class="wolf-display">
+                <div id="wolf-sprite" class="wolf-sprite"></div>
+            </div>
+            <div class="wolf-dialogue-box">
+                <p id="wolf-dialogue-text"></p>
+            </div>
+            <div class="wolf-phase-indicator">
+                <span id="wolf-phase">フェーズ 1/3</span>
+            </div>
+            <div class="music-display wolf-music">
+                <div id="wolf-notes" class="notes-display wolf">
+                </div>
+                <div class="vs-divider">
+                    <span>♪ 心を込めて ♪</span>
+                </div>
+                <div id="wolf-player-notes" class="notes-display player">
+                </div>
+            </div>
+            <div id="wolf-piano-keyboard" class="piano">
+                <!-- JavaScriptで動的に生成 -->
+            </div>
+            <div class="dialogue-controls wolf-controls">
+                <button id="wolf-replay-btn" class="btn-icon" title="もういちど聞く">🔊</button>
+                <button id="wolf-clear-btn" class="btn-icon" title="クリア">✖</button>
+                <button id="wolf-submit-btn" class="btn-primary">こたえる！</button>
+            </div>
+        </div>
+
+        <!-- エンディング画面 -->
+        <div id="ending-screen" class="screen">
+            <div class="ending-bg">
+                <div class="sunrise-sky"></div>
+                <div class="ending-sun"></div>
+                <div class="ending-ground"></div>
+            </div>
+            <div class="ending-content">
+                <h1 class="ending-title">おめでとう！</h1>
+                <div id="ending-chapter" class="ending-chapter"></div>
+                <div id="ending-animals" class="ending-animals"></div>
+                <p class="ending-text" id="ending-text">
+                    あなたのおかげで、<br>
+                    どうぶつの村に平和が戻りました。
+                </p>
+                <div class="credits">
+                    <p>〜 おしまい 〜</p>
+                </div>
+                <div class="ending-buttons">
+                    <button id="next-chapter-btn" class="btn-primary">次の章へ</button>
+                    <button id="restart-btn" class="btn-secondary">章選択に戻る</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="audio.js"></script>
+    <script src="characters.js"></script>
+    <script src="game.js"></script>
+</body>
+</html>
