@@ -259,12 +259,9 @@ class Game {
             const chapter = CHAPTERS[chapterNum];
             if (chapter && chapter.randomHideNoteNames && chapter.availableNotes) {
                 this.state.stolenNoteNames = this.generateStolenNoteNames(chapter.availableNotes);
-                console.log('Chapter 7 started. Stolen note names:', this.state.stolenNoteNames);
             } else {
                 this.state.stolenNoteNames = null;
             }
-            // デバッグログカウンターをリセット
-            this._shouldShowNoteNameLogCount = 0;
         } else {
             // 他の章ではリセット
             this.state.stolenNoteNames = null;
@@ -439,13 +436,6 @@ class Game {
     shouldShowNoteName(note) {
         const chapter = CHAPTERS[this.state.currentChapter];
         
-        // デバッグ: 7章の場合のみログを出力（最初の数回のみ）
-        if (this.state.currentChapter === 7 && (!this._shouldShowNoteNameLogCount || this._shouldShowNoteNameLogCount < 5)) {
-            if (!this._shouldShowNoteNameLogCount) this._shouldShowNoteNameLogCount = 0;
-            this._shouldShowNoteNameLogCount++;
-            console.log(`shouldShowNoteName(${note}): chapter=${chapter ? 'exists' : 'null'}, randomHideNoteNames=${chapter?.randomHideNoteNames}, currentChapter=${this.state.currentChapter}, learnedNotes=`, this.state.learnedNotes, 'stolenNoteNames=', this.state.stolenNoteNames);
-        }
-        
         // 裏モード2章：ランダムに一部非表示（優先処理）
         if (chapter && chapter.randomHideNoteNames && this.state.currentChapter === 7) {
             // 裏モード2章用の盗まれた音名リストを確認
@@ -453,17 +443,16 @@ class Game {
                 // まだ生成されていない場合は生成（フォールバック）
                 if (chapter.availableNotes) {
                     this.state.stolenNoteNames = this.generateStolenNoteNames(chapter.availableNotes);
-                    console.log('Generated stolen note names (fallback in shouldShowNoteName):', this.state.stolenNoteNames);
                 } else {
                     return true;
                 }
             }
-            // 盗まれた音名リストに含まれている場合は非表示（覚えた音でも盗まれたものは非表示）
+            // 盗まれた音名（忘れた音名）で、まだ覚えていない場合は非表示
+            // 覚えた（取り返した）音名は表示される
             const isStolen = this.state.stolenNoteNames.includes(note);
-            if (this._shouldShowNoteNameLogCount && this._shouldShowNoteNameLogCount <= 5) {
-                console.log(`shouldShowNoteName(${note}): isStolen=${isStolen}, returning ${!isStolen}`);
-            }
-            return !isStolen;
+            const isLearned = this.state.learnedNotes && this.state.learnedNotes.includes(note);
+            const shouldHide = isStolen && !isLearned;
+            return !shouldHide;
         }
         
         // 第1章または音名非表示がオフの場合は全て表示
@@ -488,7 +477,19 @@ class Game {
     learnNote(note) {
         if (!this.state.learnedNotes.includes(note)) {
             this.state.learnedNotes.push(note);
+            // 7章の場合、盗まれた音名から取り戻した（覚えた）音名を削除
+            if (this.state.currentChapter === 7 && this.state.stolenNoteNames && this.state.stolenNoteNames.includes(note)) {
+                const index = this.state.stolenNoteNames.indexOf(note);
+                if (index > -1) {
+                    this.state.stolenNoteNames.splice(index, 1);
+                }
+            }
             this.saveProgress();
+            // 7章の場合は表示を更新
+            if (this.state.currentChapter === 7) {
+                this.renderPianoKeyboard(this.elements.pianoKeyboard);
+                this.updateLearnedNotesDisplay();
+            }
         }
     }
     
@@ -823,9 +824,15 @@ class Game {
         
         this.state.targetNotes = CharacterHelper.getCurrentPhrase(character);
         
-        // 双子の場合
+        // 双子の場合（7章では3〜5匹のグループになる）
         if (character.isTwin) {
-            this.state.twinTargetNotes = CharacterHelper.getTwinPhrase(character);
+            if (character.multiCount && character.multiCount > 2) {
+                // 7章：複数匹のグループ（3〜5匹）
+                this.state.twinTargetNotes = CharacterHelper.getMultiTwinPhrases(character);
+            } else {
+                // 通常：2匹の双子
+                this.state.twinTargetNotes = [CharacterHelper.getTwinPhrase(character)];
+            }
         } else {
             this.state.twinTargetNotes = [];
         }
@@ -1085,31 +1092,65 @@ class Game {
     async playTwinNotes() {
         const character = this.state.currentCharacter;
         const notes1 = this.state.targetNotes;
-        const notes2 = this.state.twinTargetNotes;
-        const maxLength = Math.max(notes1.length, notes2.length);
+        const twinNotes = this.state.twinTargetNotes; // 配列（2匹の場合は[notes2]、複数の場合は[notes2, notes3, ...]）
         const dynamicPan = character.wobbleAnimation;
         
-        for (let i = 0; i < maxLength; i++) {
-            const chord = [];
+        // 7章で複数匹の場合
+        if (character.multiCount && character.multiCount > 2 && Array.isArray(twinNotes)) {
+            // 全てのフレーズを合わせて最大長を計算
+            const allNotes = [notes1, ...twinNotes];
+            const maxLength = Math.max(...allNotes.map(notes => notes.length));
             
-            if (i < notes1.length) {
-                chord.push(notes1[i]);
-                const bubble1 = this.createNoteBubble(notes1[i]);
-                bubble1.style.border = '3px solid #ff6b6b';
-                this.elements.animalNotes.appendChild(bubble1);
+            // 色のパレット（複数匹用）
+            const colors = ['#ff6b6b', '#6b6bff', '#6bff6b', '#ffb86b', '#b86bff'];
+            
+            for (let i = 0; i < maxLength; i++) {
+                const chord = [];
+                
+                // 各フレーズから音を取得して和音に追加
+                allNotes.forEach((notes, index) => {
+                    if (i < notes.length) {
+                        chord.push(notes[i]);
+                        const bubble = this.createNoteBubble(notes[i]);
+                        bubble.style.border = `3px solid ${colors[index % colors.length]}`;
+                        this.elements.animalNotes.appendChild(bubble);
+                    }
+                });
+                
+                // パンニングを適用（動的な場合は毎回計算）
+                const pan = dynamicPan ? this.getCharacterPan(character) : this.getCharacterPan(character);
+                if (chord.length > 0) {
+                    await audioSystem.playChord(chord, character.tempo * 0.8, 'cat', pan);
+                    await this.delay(character.tempo * 200);
+                }
             }
+        } else {
+            // 通常の2匹の双子
+            const notes2 = twinNotes[0] || [];
+            const maxLength = Math.max(notes1.length, notes2.length);
             
-            if (i < notes2.length) {
-                chord.push(notes2[i]);
-                const bubble2 = this.createNoteBubble(notes2[i]);
-                bubble2.style.border = '3px solid #6b6bff';
-                this.elements.animalNotes.appendChild(bubble2);
+            for (let i = 0; i < maxLength; i++) {
+                const chord = [];
+                
+                if (i < notes1.length) {
+                    chord.push(notes1[i]);
+                    const bubble1 = this.createNoteBubble(notes1[i]);
+                    bubble1.style.border = '3px solid #ff6b6b';
+                    this.elements.animalNotes.appendChild(bubble1);
+                }
+                
+                if (i < notes2.length) {
+                    chord.push(notes2[i]);
+                    const bubble2 = this.createNoteBubble(notes2[i]);
+                    bubble2.style.border = '3px solid #6b6bff';
+                    this.elements.animalNotes.appendChild(bubble2);
+                }
+                
+                // パンニングを適用（動的な場合は毎回計算）
+                const pan = dynamicPan ? this.getCharacterPan(character) : this.getCharacterPan(character);
+                await audioSystem.playChord(chord, character.tempo * 0.8, 'cat', pan);
+                await this.delay(character.tempo * 200);
             }
-            
-            // パンニングを適用（動的な場合は毎回計算）
-            const pan = dynamicPan ? this.getCharacterPan(character) : this.getCharacterPan(character);
-            await audioSystem.playChord(chord, character.tempo * 0.8, 'cat', pan);
-            await this.delay(character.tempo * 200);
         }
     }
     
@@ -1222,11 +1263,21 @@ class Game {
         
         if (character.isTwin) {
             // 双子の場合：交互に入力された音をチェック
-            isCorrect = CharacterHelper.compareTwinNotes(
-                this.state.playerNotes,
-                this.state.targetNotes,
-                this.state.twinTargetNotes
-            );
+            if (character.multiCount && character.multiCount > 2 && Array.isArray(this.state.twinTargetNotes)) {
+                // 7章：複数匹のグループ（3〜5匹）
+                isCorrect = CharacterHelper.compareMultiTwinNotes(
+                    this.state.playerNotes,
+                    this.state.targetNotes,
+                    this.state.twinTargetNotes
+                );
+            } else {
+                // 通常：2匹の双子
+                isCorrect = CharacterHelper.compareTwinNotes(
+                    this.state.playerNotes,
+                    this.state.targetNotes,
+                    this.state.twinTargetNotes[0] || []
+                );
+            }
         } else if (character.isRound) {
             // 輪唱の場合：繰り返しパターンで比較
             // 裏モード2章：逆方向の輪唱の場合も考慮
@@ -1281,7 +1332,16 @@ class Game {
             // すべての音を覚える（その猫のフレーズから）
             this.state.targetNotes.forEach(note => this.learnNote(note));
             if (character.isTwin) {
-                this.state.twinTargetNotes.forEach(note => this.learnNote(note));
+                if (Array.isArray(this.state.twinTargetNotes) && this.state.twinTargetNotes.length > 0) {
+                    // 複数のフレーズがある場合
+                    this.state.twinTargetNotes.forEach(notes => {
+                        if (Array.isArray(notes)) {
+                            notes.forEach(note => this.learnNote(note));
+                        } else {
+                            this.learnNote(notes);
+                        }
+                    });
+                }
             }
             
             this.showResult(true, character);

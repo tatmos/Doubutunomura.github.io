@@ -1255,7 +1255,21 @@ const CharacterHelper = {
     
     getTwinPhrase(character) {
         if (character.twinPhrases) {
-            return character.twinPhrases[character.currentPhrase % character.twinPhrases.length];
+            // twinPhrasesが配列の配列の場合（7章の複数匹対応）
+            if (Array.isArray(character.twinPhrases[0])) {
+                return character.twinPhrases[character.currentPhrase % character.twinPhrases.length] || [];
+            }
+            // 通常の場合は1つのフレーズを返す
+            return character.twinPhrases[character.currentPhrase % character.twinPhrases.length] || [];
+        }
+        return [];
+    },
+    
+    // 7章用：複数のフレーズを取得
+    getMultiTwinPhrases(character) {
+        if (character.twinPhrases && Array.isArray(character.twinPhrases)) {
+            // twinPhrasesは既に配列の配列になっている
+            return character.twinPhrases;
         }
         return [];
     },
@@ -1284,6 +1298,24 @@ const CharacterHelper = {
             if (i < notes1.length) combinedNotes.push(notes1[i]);
             if (i < notes2.length) combinedNotes.push(notes2[i]);
         }
+        return this.compareNotes(playerNotes, combinedNotes);
+    },
+    
+    // 7章用：複数の音列を比較（3〜5匹のグループ）
+    compareMultiTwinNotes(playerNotes, notes1, twinPhrasesArray) {
+        // 全てのフレーズを結合
+        const allNotes = [notes1, ...twinPhrasesArray];
+        const combinedNotes = [];
+        const maxLen = Math.max(...allNotes.map(notes => notes.length));
+        
+        for (let i = 0; i < maxLen; i++) {
+            allNotes.forEach(notes => {
+                if (i < notes.length) {
+                    combinedNotes.push(notes[i]);
+                }
+            });
+        }
+        
         return this.compareNotes(playerNotes, combinedNotes);
     },
     
@@ -1487,6 +1519,47 @@ function createDancePartyCharacters() {
     const availableNotes = CHAPTERS[7].availableNotes;
     selectedCats.forEach(cat => {
         CharacterHelper.applyDancePartyTransformations(cat, availableNotes);
+        
+        // 7章では双子猫を3〜5匹のグループに拡張
+        if (cat.isTwin) {
+            const multiCount = 3 + Math.floor(Math.random() * 3); // 3〜5匹
+            const originalPhrases = [cat.phrases[cat.currentPhrase], cat.twinPhrases[cat.currentPhrase || 0]];
+            
+            // 複数のフレーズを生成（元のフレーズから変形）
+            const multiPhrases = [originalPhrases[0]]; // 最初のフレーズはそのまま
+            for (let i = 1; i < multiCount; i++) {
+                if (i === 1 && originalPhrases[1]) {
+                    // 2番目は元のtwinPhraseを使用
+                    multiPhrases.push(originalPhrases[1]);
+                } else {
+                    // 3番目以降はランダムに変形したフレーズを生成
+                    const basePhrase = originalPhrases[i % 2] || originalPhrases[0];
+                    // フレーズをランダムに変形（逆転、シャッフル、など）
+                    let transformedPhrase = [...basePhrase];
+                    if (Math.random() < 0.5) {
+                        // 逆転
+                        transformedPhrase = [...transformedPhrase].reverse();
+                    } else {
+                        // シャッフル（最初と最後を除く）
+                        if (transformedPhrase.length > 2) {
+                            const middle = transformedPhrase.slice(1, -1);
+                            for (let j = middle.length - 1; j > 0; j--) {
+                                const k = Math.floor(Math.random() * (j + 1));
+                                [middle[j], middle[k]] = [middle[k], middle[j]];
+                            }
+                            transformedPhrase = [transformedPhrase[0], ...middle, transformedPhrase[transformedPhrase.length - 1]];
+                        }
+                    }
+                    multiPhrases.push(transformedPhrase);
+                }
+            }
+            
+            // プロパティを更新
+            cat.multiCount = multiCount;
+            cat.phrases = [multiPhrases[0]];
+            cat.twinPhrases = multiPhrases.slice(1); // 残りをtwinPhrasesに
+            cat.currentPhrase = 0;
+        }
     });
     
     // ロボ猫を追加
