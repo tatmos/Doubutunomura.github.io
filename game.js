@@ -195,9 +195,10 @@ class Game {
     renderChapterList() {
         this.elements.chapterList.innerHTML = '';
         
-        // 裏モード（6章）が解放されているかチェック
+        // 裏モードが解放されているかチェック
         const secretModeUnlocked = this.state.completedChapters.includes(5);
-        const maxChapter = secretModeUnlocked ? 6 : 5;
+        const secretMode2Unlocked = this.state.completedChapters.includes(6);
+        const maxChapter = secretMode2Unlocked ? 7 : (secretModeUnlocked ? 6 : 5);
         
         for (let i = 1; i <= maxChapter; i++) {
             const chapter = CHAPTERS[i];
@@ -209,6 +210,9 @@ class Game {
             } else if (i === 6) {
                 // 裏モードは5章クリア後に解放
                 isUnlocked = secretModeUnlocked;
+            } else if (i === 7) {
+                // 裏モード2章は6章クリア後に解放
+                isUnlocked = secretMode2Unlocked;
             } else {
                 isUnlocked = this.state.completedChapters.includes(i - 1);
             }
@@ -247,6 +251,20 @@ class Game {
         this.state.currentCharacter = null;
         this.state.playerNotes = [];
         this.state.wolfDefeated = false;
+        // 裏モード2章用の盗まれた音名をリセット・生成
+        if (chapterNum === 7) {
+            // 章開始時に盗まれた音名を生成
+            const chapter = CHAPTERS[chapterNum];
+            if (chapter && chapter.randomHideNoteNames && chapter.availableNotes) {
+                this.state.stolenNoteNames = this.generateStolenNoteNames(chapter.availableNotes);
+                console.log('Chapter 7 started. Stolen note names:', this.state.stolenNoteNames);
+            } else {
+                this.state.stolenNoteNames = null;
+            }
+        } else {
+            // 他の章ではリセット
+            this.state.stolenNoteNames = null;
+        }
         
         // 章ごとの設定でキャラクターを準備
         this.prepareChapterCharacters();
@@ -268,14 +286,80 @@ class Game {
     
     prepareChapterCharacters() {
         const chapter = CHAPTERS[this.state.currentChapter];
-        const chapterData = CHAPTER_CHARACTERS[this.state.currentChapter];
+        if (!chapter) {
+            console.error(`Chapter ${this.state.currentChapter} not found`);
+            return;
+        }
         
-        if (!chapterData) return;
+        let chapterData = CHAPTER_CHARACTERS[this.state.currentChapter];
         
-        // ランダム化が有効な章の場合
-        if (chapter.randomizePhrases) {
+        // 裏モード2章の場合はキャラクターを動的に生成
+        if (this.state.currentChapter === 7) {
+            try {
+                if (typeof createDancePartyCharacters === 'function') {
+                    const dynamicCats = createDancePartyCharacters();
+                    chapterData = {
+                        cats: dynamicCats,
+                        wolf: createWolf(7)
+                    };
+                    // キャッシュを更新
+                    CHAPTER_CHARACTERS[7] = chapterData;
+                } else {
+                    console.error('createDancePartyCharacters is not defined');
+                    // フォールバック：空のキャラクターリスト
+                    chapterData = {
+                        cats: [],
+                        wolf: createWolf(7)
+                    };
+                    CHAPTER_CHARACTERS[7] = chapterData;
+                }
+            } catch (error) {
+                console.error('Error creating dance party characters:', error);
+                // フォールバック
+                chapterData = {
+                    cats: [],
+                    wolf: createWolf(7)
+                };
+                CHAPTER_CHARACTERS[7] = chapterData;
+            }
+        }
+        
+        if (!chapterData) {
+            console.error(`Chapter data for chapter ${this.state.currentChapter} not found`);
+            return;
+        }
+        
+        // 7章の場合はcatsがnullの可能性があるので、動的生成後にチェック
+        if (this.state.currentChapter === 7 && (!chapterData.cats || chapterData.cats.length === 0)) {
+            console.warn('Chapter 7 cats not initialized, skipping character preparation');
+            return;
+        }
+        
+        if (!chapterData.cats || !Array.isArray(chapterData.cats)) {
+            console.error(`Invalid cats array for chapter ${this.state.currentChapter}`);
+            return;
+        }
+        
+        // ランダム化が有効な章の場合（裏モード2章は既に変形済みなのでスキップ）
+        if (chapter.randomizePhrases && this.state.currentChapter !== 7) {
             chapterData.cats.forEach(cat => {
-                CharacterHelper.randomizeCharacterPhrases(cat, chapter.availableNotes);
+                if (cat && cat.phrases) {
+                    CharacterHelper.randomizeCharacterPhrases(cat, chapter.availableNotes);
+                }
+            });
+        }
+        
+        // 裏モード2章の場合は位置を再設定
+        if (this.state.currentChapter === 7 && chapterData.cats && Array.isArray(chapterData.cats)) {
+            const positions = [
+                { x: 15, y: 55 }, { x: 30, y: 62 }, { x: 50, y: 60 },
+                { x: 65, y: 58 }, { x: 40, y: 70 }, { x: 75, y: 55 },
+                { x: 25, y: 65 }, { x: 55, y: 52 }, { x: 70, y: 62 }
+            ];
+            chapterData.cats.forEach((cat, index) => {
+                if (!cat.position || cat.position.x === undefined) {
+                    cat.position = positions[index % positions.length] || { x: 50, y: 58 };
+                }
             });
         }
     }
@@ -351,13 +435,50 @@ class Game {
     shouldShowNoteName(note) {
         const chapter = CHAPTERS[this.state.currentChapter];
         
+        // デバッグ: 7章の場合のみログを出力（最初の数回のみ）
+        if (this.state.currentChapter === 7 && (!this._shouldShowNoteNameLogCount || this._shouldShowNoteNameLogCount < 5)) {
+            if (!this._shouldShowNoteNameLogCount) this._shouldShowNoteNameLogCount = 0;
+            this._shouldShowNoteNameLogCount++;
+            console.log(`shouldShowNoteName(${note}): chapter=${chapter ? 'exists' : 'null'}, randomHideNoteNames=${chapter?.randomHideNoteNames}, currentChapter=${this.state.currentChapter}, learnedNotes=`, this.state.learnedNotes, 'stolenNoteNames=', this.state.stolenNoteNames);
+        }
+        
+        // 裏モード2章：ランダムに一部非表示（優先処理）
+        if (chapter && chapter.randomHideNoteNames && this.state.currentChapter === 7) {
+            // 裏モード2章用の盗まれた音名リストを確認
+            if (!this.state.stolenNoteNames || !Array.isArray(this.state.stolenNoteNames)) {
+                // まだ生成されていない場合は生成（フォールバック）
+                if (chapter.availableNotes) {
+                    this.state.stolenNoteNames = this.generateStolenNoteNames(chapter.availableNotes);
+                    console.log('Generated stolen note names (fallback in shouldShowNoteName):', this.state.stolenNoteNames);
+                } else {
+                    return true;
+                }
+            }
+            // 盗まれた音名リストに含まれている場合は非表示（覚えた音でも盗まれたものは非表示）
+            const isStolen = this.state.stolenNoteNames.includes(note);
+            if (this._shouldShowNoteNameLogCount && this._shouldShowNoteNameLogCount <= 5) {
+                console.log(`shouldShowNoteName(${note}): isStolen=${isStolen}, returning ${!isStolen}`);
+            }
+            return !isStolen;
+        }
+        
         // 第1章または音名非表示がオフの場合は全て表示
-        if (!chapter.hideNoteNames) {
+        if (!chapter || !chapter.hideNoteNames) {
             return true;
         }
         
         // 覚えた音は表示
-        return this.state.learnedNotes.includes(note);
+        return this.state.learnedNotes && this.state.learnedNotes.includes(note);
+    }
+    
+    /**
+     * 盗まれた音名をランダムに生成
+     */
+    generateStolenNoteNames(availableNotes) {
+        const stolen = [];
+        const stolenCount = Math.floor(availableNotes.length * (0.3 + Math.random() * 0.1)); // 30-40%
+        const notesToSteal = [...availableNotes].sort(() => Math.random() - 0.5).slice(0, stolenCount);
+        return notesToSteal;
     }
     
     learnNote(note) {
@@ -668,7 +789,9 @@ class Game {
             'トルコ行進曲': 'cat_energetic',
             '威風堂々': 'cat',
             '大きい・低い': 'wolf',
-            '大きい・高い': 'cat'
+            '大きい・高い': 'cat',
+            '機械音': 'cat',
+            'プログラミング': 'cat'
         };
         
         return personalityMap[character.personality] || 'cat';
@@ -759,7 +882,20 @@ class Game {
                 // リズム跳ね：音価を変える
                 let noteDuration = character.tempo * 0.8;
                 let noteDelay = character.tempo * 200;
-                if (isBouncyRhythm) {
+                
+                // リズムシャフル（裏モード2章）
+                if (character.shuffledRhythm || (character.dancePartyTransformations && character.dancePartyTransformations.includes('shuffle'))) {
+                    // シャッフルされたリズムパターン（不規則な音価）
+                    const patterns = [
+                        { duration: 0.4, delay: 100 },
+                        { duration: 0.6, delay: 150 },
+                        { duration: 0.3, delay: 80 },
+                        { duration: 0.8, delay: 200 }
+                    ];
+                    const pattern = patterns[i % patterns.length];
+                    noteDuration = character.tempo * pattern.duration;
+                    noteDelay = character.tempo * pattern.delay;
+                } else if (isBouncyRhythm) {
                     // 8分音符、8分音符、4分音符のパターン
                     if (i % 3 === 0 || i % 3 === 1) {
                         noteDuration = character.tempo * 0.4; // 8分音符
@@ -767,6 +903,15 @@ class Game {
                     } else {
                         noteDuration = character.tempo * 0.8; // 4分音符
                         noteDelay = character.tempo * 200;
+                    }
+                }
+                
+                // 休符の処理（ロボットキャラクター）
+                if (character.hasRest && character.isRobot) {
+                    // ランダムに休符を挿入
+                    if (Math.random() < 0.15 && i > 0) { // 15%の確率（最初の音以外）
+                        await this.delay(noteDelay * 2); // 休符（音を出さずに待つ）
+                        continue; // この音をスキップ
                     }
                 }
                 
@@ -813,13 +958,21 @@ class Game {
      * 輪唱：フレーズを繰り返し再生
      */
     async playRoundNotes(character) {
-        const phrase = this.state.targetNotes;
+        let phrase = this.state.targetNotes;
         const repeatCount = 2;  // 2回繰り返す
         const highPitch = character.highPitch || false;
         
+        // 裏モード2章：輪唱の逆方向
+        const isReverse = character.roundReverse || false;
+        
         for (let round = 0; round < repeatCount; round++) {
-            for (let i = 0; i < phrase.length; i++) {
-                const note = phrase[i];
+            // 逆方向の場合はフレーズを逆順にする
+            const notesToPlay = isReverse && round === 1 
+                ? [...phrase].reverse() 
+                : phrase;
+            
+            for (let i = 0; i < notesToPlay.length; i++) {
+                const note = notesToPlay[i];
                 const bubble = this.createNoteBubble(note);
                 // 繰り返し回数によって色を変える
                 if (round > 0) {
@@ -836,6 +989,13 @@ class Game {
                 } else if (character.lowPitch) {
                     octaveShift = -1;
                 }
+                
+                // 休符の処理（ロボットキャラクター）
+                if (character.hasRest && character.isRobot && Math.random() < 0.1 && i > 0) {
+                    await this.delay(character.tempo * 200 * 2);
+                    continue;
+                }
+                
                 await audioSystem.playNote(note, character.tempo * 0.8, character.type || 'cat', pan, octaveShift);
                 await this.delay(character.tempo * 200);
             }
@@ -910,15 +1070,34 @@ class Game {
             );
         } else if (character.isRound) {
             // 輪唱の場合：繰り返しパターンで比較
-            isCorrect = CharacterHelper.compareRoundNotes(
-                this.state.playerNotes,
-                this.state.targetNotes
-            );
+            // 裏モード2章：逆方向の輪唱の場合も考慮
+            let targetPhrase = this.state.targetNotes;
+            if (character.roundReverse) {
+                // 順方向と逆方向の両方をチェック
+                const forward = [...targetPhrase, ...targetPhrase];
+                const reverse = [...targetPhrase, ...[...targetPhrase].reverse()];
+                isCorrect = CharacterHelper.compareNotes(this.state.playerNotes, forward) || 
+                           CharacterHelper.compareNotes(this.state.playerNotes, reverse);
+            } else {
+                isCorrect = CharacterHelper.compareRoundNotes(
+                    this.state.playerNotes,
+                    targetPhrase
+                );
+            }
         } else {
-            isCorrect = CharacterHelper.compareNotes(
-                this.state.playerNotes,
-                this.state.targetNotes
-            );
+            // 通常の比較
+            // ロボットキャラクターの場合は休符を考慮
+            if (character.hasRest && character.isRobot) {
+                isCorrect = CharacterHelper.compareNotesWithRests(
+                    this.state.playerNotes,
+                    this.state.targetNotes
+                );
+            } else {
+                isCorrect = CharacterHelper.compareNotes(
+                    this.state.playerNotes,
+                    this.state.targetNotes
+                );
+            }
         }
         
         this.state.isPlaying = true;

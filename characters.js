@@ -80,6 +80,23 @@ const CHAPTERS = {
         hasWitchCat: true,
         isSecretMode: true,  // 裏モードフラグ
         availableNotes: ['do', 'do#', 're', 're#', 'mi', 'fa', 'fa#', 'so', 'so#', 'la', 'la#', 'ti']
+    },
+    7: {
+        id: 7,
+        title: '裏モード2章：ダンスパーティ',
+        subtitle: '村祭りの大騒動',
+        description: 'ダンスパーティ開催中！音名表示が一部盗まれてる...リズムや音が変わる！',
+        unlocked: false,  // 6章クリア後に解放
+        hideNoteNames: true,  // 一部ランダムに非表示
+        randomHideNoteNames: true,  // ランダムに一部非表示
+        randomizePhrases: true,
+        hasBlackKeys: true,
+        hasTwins: true,
+        hasFastCat: true,
+        hasWitchCat: true,
+        isSecretMode: true,
+        hasDanceParty: true,  // ダンスパーティモード
+        availableNotes: ['do', 'do#', 're', 're#', 'mi', 'fa', 'fa#', 'so', 'so#', 'la', 'la#', 'ti']
     }
 };
 
@@ -952,6 +969,12 @@ const CHAPTER_CHARACTERS = {
             }
         ],
         wolf: createWolf(6)  // 裏モード用の狼も作成
+    },
+    
+    // ===== 裏モード2章：ダンスパーティ =====
+    7: {
+        cats: null,  // prepareChapterCharactersで動的に生成
+        wolf: null   // prepareChapterCharactersで動的に生成
     }
 };
 
@@ -1155,6 +1178,21 @@ function createWolf(chapter) {
                 tempo: 0.3,
                 dance: true
             }
+        ],
+        7: [
+            {
+                emotion: 'playful',
+                phrases: [['do', 'do#', 're', 're#', 'mi', 'fa', 'fa#', 'so', 'so#', 'la', 'la#', 'ti']],
+                dialogue: {
+                    intro: 'ワン！ワン！ワン！ワン！♪♪♪♪\n（ダンスパーティの最後！全ての音楽的変形をマスターしたね！）',
+                    challenge: 'ウォーン♪♪♪♪\n（全ての12音で最高のダンスをしよう！）',
+                    success: 'ワオーーーーン！！（最高だ！！一緒に踊ろう！！）',
+                    failure: 'クゥン...（もう少し...！）'
+                },
+                tempo: 0.25,
+                dance: true,
+                shuffledRhythm: true  // リズムシャフル
+            }
         ]
     };
     
@@ -1191,7 +1229,8 @@ const STORY = {
         3: '第3章へようこそ！\n双子の猫が現れます！\n同時に聞こえる2つの音を聞き分けましょう。\n和音の美しさを感じてください。',
         4: '第4章へようこそ！\n早口猫や魔女猫が登場！\n速さや長さに挑戦しましょう。\n個性豊かな仲間たちが待っています。',
         5: '最終章へようこそ！\nシ♭やファ#など、新しい音も登場します。\n全ての音をマスターしましょう！\nこれは最後の試練です。',
-        6: '裏モード：平和の世界へようこそ！\n全ての章をクリアし、村に平和が戻りました。\n他所からも様々などうぶつたちが集まってきました。\n輪唱やリズム遊びなど、より音楽的な要素が増えています。\nガルムもご機嫌で、あなたと一緒に遊びたがっています！'
+        6: '裏モード：平和の世界へようこそ！\n全ての章をクリアし、村に平和が戻りました。\n他所からも様々などうぶつたちが集まってきました。\n輪唱やリズム遊びなど、より音楽的な要素が増えています。\nガルムもご機嫌で、あなたと一緒に遊びたがっています！',
+        7: '裏モード2章：ダンスパーティへようこそ！\n村祭りのダンスパーティが開催中です！\nしかし、いたずら子猫が鍵盤の音名表示を一部盗んでしまいました...\n今まで出会ったキャラクターたちが再登場しますが、\nリズムがシャフルされていたり、音が反行・逆行していたり...\n様々なスケール感もランダムに適用されます！\n最大の難易度に挑戦しましょう！'
     },
     
     ending: {
@@ -1200,7 +1239,8 @@ const STORY = {
         3: 'ガルムは、双子の猫たちに興味を持っていました。\nあなたが奏でたハーモニーが、\nガルムの孤独を癒してくれました。\nこれからは、みんなで一緒に歌えるでしょう...',
         4: 'ガルムは、個性豊かな猫たちに憧れていました。\nあなたがすべての個性を受け入れたように、\nガルムも自分自身を受け入れられるようになりました。\n多様性の美しさを感じています...',
         5: 'ガルムは、全ての音を聞きたかったのです。\nあなたが奏でた12音すべてが、\nガルムの心を満たしてくれました。\nこれで音楽の世界は完成です...\n\n（裏モードが解放されました！）',
-        6: '平和が戻った村では、\n様々などうぶつたちが集まってきました。\n輪唱やリズム遊びなど、\n音楽がさらに豊かになっています。\n\nガルムもご機嫌で、\nあなたと一緒に音楽を楽しんでいます。\nこれからも、この平和な世界で\n音楽を奏で続けていきましょう...'
+        6: '平和が戻った村では、\n様々などうぶつたちが集まってきました。\n輪唱やリズム遊びなど、\n音楽がさらに豊かになっています。\n\nガルムもご機嫌で、\nあなたと一緒に音楽を楽しんでいます。\nこれからも、この平和な世界で\n音楽を奏で続けていきましょう...',
+        7: 'ダンスパーティは大成功でした！\nいたずら子猫も最後には仲直りして、\n盗んだ音名表示を返してくれました。\n\nリズムシャフル、反行、逆行、様々なスケール...\n全ての音楽的変形をマスターしたあなたは、\n真の音楽の達人となりました！\n\n村のみんなは、あなたのことを\n永遠に語り継ぐことでしょう...'
     }
 };
 
@@ -1254,6 +1294,14 @@ const CharacterHelper = {
         return this.compareNotes(playerNotes, repeatedPhrase);
     },
     
+    // 休符を除いて比較（ロボットキャラクター用）
+    compareNotesWithRests(playerNotes, targetNotes) {
+        // 休符（nullや特殊な記号）を除いて比較
+        // 実際には休符は音が鳴らないので、プレイヤーの入力数とターゲットの音数で比較
+        // 簡易版：通常の比較を使用（休符は再生時にスキップされるため）
+        return this.compareNotes(playerNotes, targetNotes);
+    },
+    
     nextPhrase(character) {
         if (character.phrases && character.phrases.length > 1) {
             character.currentPhrase = Math.floor(Math.random() * character.phrases.length);
@@ -1278,5 +1326,214 @@ const CharacterHelper = {
             const twinLength = character.twinPhrases[0].length;
             character.twinPhrases = [this.generateRandomPhrase(twinLength, availableNotes)];
         }
+    },
+    
+    // 裏モード2章用：音楽的変形を適用
+    applyDancePartyTransformations(character, availableNotes) {
+        const originalPhrases = [...character.phrases];
+        const transformedPhrases = [];
+        
+        for (const phrase of originalPhrases) {
+            let transformed = [...phrase];
+            
+            // ランダムに変形を適用
+            const transformations = [];
+            
+            // リズムシャフル（30%の確率）
+            if (Math.random() < 0.3) {
+                transformed = this.shuffleRhythm(transformed);
+                transformations.push('shuffle');
+            }
+            
+            // 反行（上下逆）（25%の確率）
+            if (Math.random() < 0.25) {
+                transformed = this.invert(transformed);
+                transformations.push('invert');
+            }
+            
+            // 逆行（前後逆）（25%の確率）
+            if (Math.random() < 0.25) {
+                transformed = this.retrograde(transformed);
+                transformations.push('retrograde');
+            }
+            
+            // スケール変換（40%の確率）
+            if (Math.random() < 0.4) {
+                const scaleType = ['minor', 'ethnic', 'mysterious', 'alt'][Math.floor(Math.random() * 4)];
+                transformed = this.applyScale(transformed, scaleType, availableNotes);
+                transformations.push(scaleType);
+            }
+            
+            transformedPhrases.push(transformed);
+            character.dancePartyTransformations = transformations;
+        }
+        
+        character.phrases = transformedPhrases;
+        
+        // 輪唱の場合、順方向・逆方向をランダムに
+        if (character.isRound) {
+            character.roundReverse = Math.random() < 0.5;
+        }
+        
+        // リズムシャフルフラグ
+        if (character.phrases.some((_, i) => character.dancePartyTransformations && character.dancePartyTransformations.includes('shuffle'))) {
+            character.shuffledRhythm = true;
+        }
+    },
+    
+    // リズムシャフル：長さを保ちながら順序をシャッフル
+    shuffleRhythm(phrase) {
+        const shuffled = [...phrase];
+        // フィッシャー-イェーツのシャッフル
+        for (let i = shuffled.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+        }
+        return shuffled;
+    },
+    
+    // 反行（上下逆）：ドレミファソラシ → シラソファミレド（中央のドを軸に反転）
+    invert(phrase) {
+        // ドを基準に反転（簡易版：音階を逆にする）
+        const noteOrder = ['do', 'do#', 're', 're#', 'mi', 'fa', 'fa#', 'so', 'so#', 'la', 'la#', 'ti'];
+        return phrase.map(note => {
+            const index = noteOrder.indexOf(note);
+            if (index === -1) return note;
+            // 中央（ド=0）を軸に反転
+            const invertedIndex = -index;
+            // 12音を超えないように調整
+            const newIndex = ((invertedIndex % 12) + 12) % 12;
+            return noteOrder[newIndex];
+        });
+    },
+    
+    // 逆行（前後逆）
+    retrograde(phrase) {
+        return [...phrase].reverse();
+    },
+    
+    // スケール変換
+    applyScale(phrase, scaleType, availableNotes) {
+        // 簡易版：スケールに合わせて音を変換
+        // 実際の実装ではより複雑なスケール変換が必要
+        return phrase.map(note => {
+            if (scaleType === 'minor') {
+                // マイナースケール：ミ、ラ、シを半音下げる
+                const minorMap = {'mi': 're#', 'la': 'so#', 'ti': 'la#'};
+                return minorMap[note] || note;
+            } else if (scaleType === 'ethnic') {
+                // 民族的なスケール：一部の音を変更
+                const ethnicMap = {'fa': 'fa#', 'ti': 'la#'};
+                return ethnicMap[note] || note;
+            } else if (scaleType === 'mysterious') {
+                // 神秘的なスケール：半音階的
+                const noteOrder = ['do', 'do#', 're', 're#', 'mi', 'fa', 'fa#', 'so', 'so#', 'la', 'la#', 'ti'];
+                const index = noteOrder.indexOf(note);
+                if (index === -1) return note;
+                // ランダムに半音上げるか下げる
+                const offset = Math.random() < 0.5 ? 1 : -1;
+                const newIndex = Math.max(0, Math.min(11, index + offset));
+                return noteOrder[newIndex];
+            } else if (scaleType === 'alt') {
+                // Altスケール：特定の音を変化
+                const altMap = {'do': 'do#', 're': 're#', 'fa': 'fa#', 'so': 'so#', 'la': 'la#'};
+                return altMap[note] || note;
+            }
+            return note;
+        });
     }
 };
+
+/**
+ * 裏モード2章のキャラクターを生成
+ */
+function createDancePartyCharacters() {
+    // 過去の章からキャラクターをランダムに選択
+    const allCats = [];
+    
+    // 各章からキャラクターを収集
+    for (let chapter = 1; chapter <= 6; chapter++) {
+        const chapterData = CHAPTER_CHARACTERS[chapter];
+        // 7章の場合はスキップ（まだ定義中）
+        if (chapter === 7) continue;
+        if (chapterData && chapterData.cats && Array.isArray(chapterData.cats)) {
+            chapterData.cats.forEach(cat => {
+                // ベースとなるキャラクターをコピー
+                const copiedCat = JSON.parse(JSON.stringify(cat));
+                copiedCat.id = `dance_${cat.id}_${Math.random().toString(36).substr(2, 9)}`;
+                copiedCat.originalId = cat.id;
+                allCats.push(copiedCat);
+            });
+        }
+    }
+    
+    // ランダムに5-7匹を選択
+    const selectedCount = 5 + Math.floor(Math.random() * 3);
+    const selectedCats = [];
+    const usedIds = new Set();
+    
+    while (selectedCats.length < selectedCount && allCats.length > 0) {
+        const randomIndex = Math.floor(Math.random() * allCats.length);
+        const cat = allCats.splice(randomIndex, 1)[0];
+        
+        // 重複を避ける（同じ元のキャラクターは1回まで）
+        if (!usedIds.has(cat.originalId)) {
+            usedIds.add(cat.originalId);
+            selectedCats.push(cat);
+        }
+    }
+    
+    // ダンスパーティ変形を適用
+    const availableNotes = CHAPTERS[7].availableNotes;
+    selectedCats.forEach(cat => {
+        CharacterHelper.applyDancePartyTransformations(cat, availableNotes);
+    });
+    
+    // ロボ猫を追加
+    selectedCats.push({
+        id: 'cat_robo',
+        name: 'ロボ猫',
+        type: 'cat',
+        emoji: '🤖',
+        personality: '機械音',
+        description: '繰り返しと平行移動の機械音を発する猫',
+        position: { x: 50, y: 58 },
+        phrases: [['do', 're', 'mi', 'do', 're', 'mi', 'fa', 'so']],  // 繰り返し多め
+        currentPhrase: 0,
+        tempo: 0.3,
+        difficulty: 7,
+        isRobot: true,
+        hasRest: true,  // 休符を含む
+        dialogue: {
+            greeting: 'ビープ ビープ ニャ♪\n（機械的な音を発している...繰り返しが多い...）',
+            success: 'ビープ♡ニャ♡\n（ロボ猫が最高にデレデレになった！機械音で甘えたがってる！）',
+            failure: 'ビープ...？\n（システムエラーで停止した...）',
+            retry: 'ビープ♡...？\n（再起動して戻ってきた...）'
+        }
+    });
+    
+    // エンジニア猫を追加
+    selectedCats.push({
+        id: 'cat_engineer',
+        name: 'エンジニア猫',
+        type: 'cat',
+        emoji: '👨‍💻',
+        personality: 'プログラミング',
+        description: 'プログラミングのような音列を発する猫',
+        position: { x: 70, y: 62 },
+        phrases: [['do', 'do', 're', 're', 'mi', 'fa', 'fa', 'so']],  // 繰り返しパターン
+        currentPhrase: 0,
+        tempo: 0.25,
+        difficulty: 7,
+        isRobot: true,
+        hasRest: true,
+        dialogue: {
+            greeting: 'コード コード ニャ♪\n（プログラミングのような音列...繰り返しと休符がある...）',
+            success: 'コード♡ニャ♡\n（エンジニア猫が最高にデレデレになった！コードを奏でながら甘えたがってる！）',
+            failure: 'コード...？\n（バグでクラッシュした...）',
+            retry: 'コード♡...？\n（デバッグして戻ってきた...）'
+        }
+    });
+    
+    return selectedCats;
+}
