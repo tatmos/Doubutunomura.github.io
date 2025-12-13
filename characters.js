@@ -699,6 +699,256 @@ const CHAPTER_CHARACTERS = {
                     failure: 'キョロ...？\n（不気味に消えていった...）',
                     retry: 'ニャ♡...？\n（戻ってきた...あなたが好きなのかも...）'
                 }
+            },
+            {
+                id: 'cat_kaeru',
+                name: 'かえる猫',
+                type: 'cat',
+                emoji: '🐸',
+                personality: '輪唱・繰り返し',
+                description: '輪唱のように繰り返す鳴き声の猫',
+                position: { x: 60, y: 62 },
+                phrases: [['do', 're', 'mi', 'do', 're', 'mi']],  // 繰り返しフレーズ
+                currentPhrase: 0,
+                tempo: 0.4,
+                difficulty: 5,
+                frogJump: true,  // カエル飛びアニメーション
+                isRound: true,  // 輪唱フラグ
+                dialogue: {
+                    greeting: 'ケロケロ ニャニャ♪\n（輪唱のように繰り返す鳴き声...）',
+                    success: 'ケロ♡ニャ♡ケロ♡ニャ♡\n（かえる猫が最高にデレデレになった！ぴょんぴょん跳ねて喜んでる！）',
+                    failure: 'ケロ...？\n（ぴょんと跳ねて行ってしまった...）',
+                    retry: 'ケロ♡...？\n（戻ってきた...もう一度聞いてほしい？）'
+                }
+            },
+            {
+                id: 'cat_usagi',
+                name: 'ウサギ猫',
+                type: 'cat',
+                emoji: '🐰',
+                personality: 'リズム跳ね',
+                description: 'リズムに合わせて跳ねる猫',
+                position: { x: 45, y: 58 },
+                phrases: [['do', 'mi', 'so', 'do', 'so', 'mi', 'do']],
+                currentPhrase: 0,
+                tempo: 0.35,
+                difficulty: 5,
+                rabbitHop: true,  // ウサギ飛びアニメーション
+                bouncyRhythm: true,  // リズムが跳ねている
+                octaveBounce: true,  // 音域が跳ねている（交互にオクターブ上がる）
+                dialogue: {
+                    greeting: 'ピョンピョン ニャニャ♪\n（リズムに合わせて跳ねている...音域も跳ねている！）',
+                    success: 'ピョン♡ピョン♡ニャ♡\n（ウサギ猫が最高にデレデレになった！ぴょんぴょん跳ねて甘えたがってる！）',
+                    failure: 'ピョン...？\n（しょんぼりして跳ねていった...）',
+                    retry: 'ピョン♡...？\n（戻ってきた...もう一度遊びたい？）'
+                }
+            },
+            {
+                id: 'cat_tori',
+                name: '小鳥猫',
+                type: 'bird',
+                emoji: '🐦',
+                personality: '小さい・細かく早い',
+                description: '小さくて細かく早い鳴き声の猫',
+                position: { x: 20, y: 50 },
+                phrases: [['la', 'ti', 'la', 'ti', 'la']],  // 高い音域
+                currentPhrase: 0,
+                tempo: 0.2,  // とても速い
+                difficulty: 6,
+                highPitch: true,  // 高い音域
+                fastTempo: true,  // 速いテンポ
+                dialogue: {
+                    greeting: 'チュチュチュ ニャニャ♪\n（小さくて細かく早い鳴き声...）',
+                    success: 'チュ♡チュ♡ニャ♡\n（小鳥猫が最高にデレデレになった！小さく甘えたがってる！）',
+                    failure: 'チュ...？\n（小さく飛んでいった...）',
+                    retry: 'チュ♡...？\n（戻ってきた...もっと話したい？）'
+                }
+            },
+            {
+                id: 'cat_risu',
+                name: 'リス猫',
+                type: 'cat',
+                emoji: '🐿️',
+                personality: '輪唱・小さい',
+                description: '輪唱のように繰り返す小さな猫',
+                position: { x: 55, y: 48 },
+                phrases: [['so', 'la', 'ti', 'so', 'la', 'ti']],  // 高い音域・輪唱
+                currentPhrase: 0,
+                tempo: 0.25,
+                difficulty: 6,
+                isRound: true,  // 輪唱
+                highPitch: true,
+                dialogue: {
+                    greeting: 'チッチッ ニャニャ♪\n（輪唱のように繰り返す小さな鳴き声...）',
+                    success: 'チッ♡チッ♡ニャ♡\n（リス猫が最高にデレデレになった！輪唱しながら甘えたがってる！）',
+                    failure: 'チッ...？\n（小さく逃げていった...）',
+                    retry: 'チッ♡...？\n（戻ってきた...もう一度聞いてほしい？）'
+                }
+            },
+            {
+                id: 'cat_nezu',
+                name: 'ねずみ猫',
+                type: 'cat',
+                emoji: '🐭',
+                personality: '小さい・細かく早い',
+                description: 'とても小さくて細かく早い鳴き声の猫',
+                position: { x: 40, y: 52 },
+                phrases: [['ti', 'la', 'ti', 'la', 'ti', 'so']],  // 高い音域
+                currentPhrase: 0,
+                tempo: 0.18,  // 非常に速い
+                difficulty: 7,
+                highPitch: true,
+                fastTempo: true,
+                dialogue: {
+                    greeting: 'チューチュー ニャニャ♪\n（とても小さくて細かく早い鳴き声...）',
+                    success: 'チュー♡チュー♡ニャ♡\n（ねずみ猫が最高にデレデレになった！小さく甘えたがってる！）',
+                    failure: 'チュー...？\n（小さく逃げていった...）',
+                    retry: 'チュー♡...？\n（戻ってきた...もっと話したい？）'
+                }
+            },
+            {
+                id: 'cat_hachi',
+                name: '蜂猫',
+                type: 'cat',
+                emoji: '🐝',
+                personality: '熊蜂の飛行',
+                description: '熊蜂の飛行モチーフの猫（リムスキー・コルサコフ「熊蜂の飛行」）',
+                position: { x: 75, y: 55 },
+                phrases: [['do', 'do#', 're', 're#', 'mi', 'fa', 'fa#', 'so', 'so#', 'la', 'la#', 'ti', 'la#', 'la', 'so#', 'so', 'fa#', 'fa', 'mi', 're#', 're', 'do#', 'do']],  // 半音階的な上昇下降
+                currentPhrase: 0,
+                tempo: 0.12,  // 非常に速い
+                difficulty: 9,
+                fastTempo: true,
+                bumblebeeFlight: true,  // 熊蜂の飛行
+                dialogue: {
+                    greeting: 'ブンブン ニャニャ♪\n（熊蜂の飛行のような速い鳴き声...リムスキー・コルサコフの名曲から！）',
+                    success: 'ブン♡ブン♡ニャ♡\n（蜂猫が最高にデレデレになった！飛び回りながら甘えたがってる！）',
+                    failure: 'ブン...？\n（飛んでいってしまった...）',
+                    retry: 'ブン♡...？\n（戻ってきた...もう一度聞いてほしい？）'
+                }
+            },
+            {
+                id: 'cat_classic1',
+                name: 'ベートーベン猫',
+                type: 'cat',
+                emoji: '🎹',
+                personality: '運命',
+                description: 'ベートーベン「運命」のモチーフ（タタタター）',
+                position: { x: 30, y: 60 },
+                phrases: [['do', 'do', 'do', 'mi']],  // 運命の動機
+                currentPhrase: 0,
+                tempo: 0.3,
+                difficulty: 4,
+                classicReference: true,
+                dialogue: {
+                    greeting: 'タタタター ニャ♪\n（ベートーベンの「運命」のモチーフだ！）',
+                    success: 'タタタター♡ニャ♡\n（ベートーベン猫が最高にデレデレになった！運命を奏でながら甘えたがってる！）',
+                    failure: 'タタタ...？\n（運命のように去っていった...）',
+                    retry: 'タタタ♡...？\n（戻ってきた...もう一度聞いてほしい？）'
+                }
+            },
+            {
+                id: 'cat_classic2',
+                name: 'モーツァルト猫',
+                type: 'cat',
+                emoji: '🎼',
+                personality: 'トルコ行進曲',
+                description: 'モーツァルト「トルコ行進曲」のモチーフ',
+                position: { x: 65, y: 62 },
+                phrases: [['do', 're', 'mi', 'fa', 'so', 'fa', 'mi', 're']],  // トルコ行進曲風
+                currentPhrase: 0,
+                tempo: 0.25,
+                difficulty: 5,
+                classicReference: true,
+                dialogue: {
+                    greeting: 'ドレミファソファミレ ニャ♪\n（モーツァルトの「トルコ行進曲」のモチーフだ！）',
+                    success: 'ドレミ♡ニャ♡\n（モーツァルト猫が最高にデレデレになった！行進しながら甘えたがってる！）',
+                    failure: 'ドレミ...？\n（行進して去っていった...）',
+                    retry: 'ドレミ♡...？\n（戻ってきた...もう一度聞いてほしい？）'
+                }
+            },
+            {
+                id: 'cat_classic3',
+                name: '威風堂々猫',
+                type: 'cat',
+                emoji: '👑',
+                personality: '威風堂々',
+                description: 'エルガー「威風堂々」のモチーフ',
+                position: { x: 50, y: 60 },
+                phrases: [['do', 'mi', 'so', 'do', 'mi', 'so', 'do', 're', 'mi', 'fa', 'so']],  // 威風堂々風
+                currentPhrase: 0,
+                tempo: 0.5,
+                difficulty: 6,
+                classicReference: true,
+                dialogue: {
+                    greeting: 'ドミソドミソ ニャ♪\n（エルガーの「威風堂々」のモチーフだ！堂々としている！）',
+                    success: 'ドミソ♡ニャ♡\n（威風堂々猫が最高にデレデレになった！堂々としながら甘えたがってる！）',
+                    failure: 'ドミソ...？\n（堂々と去っていった...）',
+                    retry: 'ドミソ♡...？\n（戻ってきた...もう一度聞いてほしい？）'
+                }
+            },
+            {
+                id: 'cat_zou',
+                name: '象猫',
+                type: 'cat',
+                emoji: '🐘',
+                personality: '大きい・低い',
+                description: '大きくて低い鳴き声の猫',
+                position: { x: 15, y: 68 },
+                phrases: [['do', 're', 'do', 'do', 're', 'do']],  // 低い音域
+                currentPhrase: 0,
+                tempo: 0.6,  // ゆっくり
+                difficulty: 3,
+                lowPitch: true,  // 低い音域
+                bigAnimal: true,
+                dialogue: {
+                    greeting: 'パオーン ニャニャ♪\n（大きくて低い鳴き声...ゆっくりとしている...）',
+                    success: 'パオーン♡ニャ♡\n（象猫が最高にデレデレになった！大きく甘えたがってる！）',
+                    failure: 'パオーン...？\n（ゆっくりと去っていった...）',
+                    retry: 'パオーン♡...？\n（戻ってきた...もう一度聞いてほしい？）'
+                }
+            },
+            {
+                id: 'cat_kirin',
+                name: 'キリン猫',
+                type: 'cat',
+                emoji: '🦒',
+                personality: '大きい・高い',
+                description: '大きくて高い鳴き声の猫',
+                position: { x: 35, y: 45 },
+                phrases: [['so', 'la', 'ti', 'so', 'la', 'ti']],  // 高い音域
+                currentPhrase: 0,
+                tempo: 0.55,
+                difficulty: 4,
+                highPitch: true,
+                bigAnimal: true,
+                dialogue: {
+                    greeting: 'キリンキリン ニャニャ♪\n（大きくて高い鳴き声...首が長いから高い音が出る...）',
+                    success: 'キリン♡ニャ♡\n（キリン猫が最高にデレデレになった！大きく甘えたがってる！）',
+                    failure: 'キリン...？\n（首を振って去っていった...）',
+                    retry: 'キリン♡...？\n（戻ってきた...もう一度聞いてほしい？）'
+                }
+            },
+            {
+                id: 'cat_kuma',
+                name: 'クマ猫',
+                type: 'cat',
+                emoji: '🐻',
+                personality: '大きい・低い',
+                description: '大きくて低い鳴き声の猫',
+                position: { x: 80, y: 65 },
+                phrases: [['do', 'mi', 'so', 'do', 'so', 'mi', 'do']],  // 低い音域
+                currentPhrase: 0,
+                tempo: 0.65,  // とてもゆっくり
+                difficulty: 4,
+                lowPitch: true,
+                bigAnimal: true,
+                dialogue: {
+                    greeting: 'ガオー ニャニャ♪\n（大きくて低い鳴き声...のんびりしている...）',
+                    success: 'ガオー♡ニャ♡\n（クマ猫が最高にデレデレになった！大きく甘えたがってる！）',
+                    failure: 'ガオー...？\n（のんびりと去っていった...）',
+                    retry: 'ガオー♡...？\n（戻ってきた...もう一度聞いてほしい？）'
+                }
             }
         ],
         wolf: createWolf(6)  // 裏モード用の狼も作成
@@ -855,37 +1105,55 @@ function createWolf(chapter) {
         ],
         6: [
             {
-                emotion: 'angry',
-                phrases: [['do#', 'mi', 'fa#', 'la#', 're', 'so#']],
+                emotion: 'playful',
+                phrases: [['do', 'mi', 'so', 'do']],  // オクターブ増加で変化
                 dialogue: { 
-                    intro: 'グルルル...！！（狂気の音が響く...）', 
-                    challenge: 'ガウッ！全ての音をまねろ！', 
-                    success: 'グル...♪（驚いている...）', 
-                    failure: 'ガウウウ！！（さらに狂気が増した...）' 
+                    intro: 'ワン！ワン！♪\n（ご機嫌で遊びたがっている！）', 
+                    challenge: 'ウォーン♪\n（高く跳ねて遊ぼう！）', 
+                    success: 'ワオーーン！！（楽しい！もっと遊ぼう！）', 
+                    failure: 'クゥン...（もう一度挑戦して！）' 
                 },
-                tempo: 0.3
+                tempo: 0.5,
+                octaveShift: 1,  // オクターブ上げる
+                dance: true  // ダンスする
             },
             {
-                emotion: 'calm',
-                phrases: [['re#', 'fa', 'so#', 'la#', 'do', 'mi', 'fa#', 'ti']],
+                emotion: 'playful',
+                phrases: [['do', 're#', 'fa#', 'la#']],  // 変化する音
                 dialogue: { 
-                    intro: 'ウォーン...（神秘的な音が響く）', 
-                    challenge: 'クゥーン...（複雑な調べ...）', 
-                    success: 'ウォン！（認めた！）', 
-                    failure: 'グルル...（まだまだ...）' 
+                    intro: 'ワン！ワン！♪♪\n（リズムが変わるよ！）', 
+                    challenge: 'ウォーン♪♪♪\n（変わったリズムをまねしてみて！）', 
+                    success: 'ワオーーン！！（すごい！リズム感がいいね！）', 
+                    failure: 'クゥン...（リズムが違うかも...）' 
                 },
-                tempo: 0.32
+                tempo: 0.4,
+                bouncyRhythm: true,  // 跳ねるリズム
+                dance: true
             },
             {
-                emotion: 'happy',
-                phrases: [['do', 'do#', 're', 're#', 'mi', 'fa', 'fa#', 'so', 'so#', 'la', 'la#', 'ti']],
+                emotion: 'playful',
+                phrases: [['do', 'mi', 'so', 'ti', 'so', 'mi', 'do']],  // 音域が広がる
                 dialogue: { 
-                    intro: 'ワン！ワン！（全ての音を使える！）', 
-                    challenge: 'ウォーン♪（全ての12音を奏でろ！）', 
-                    success: 'ワオーーン！！（完璧だ！！最高の音楽家だ！！）', 
-                    failure: 'クゥン...（もう少し...！）' 
+                    intro: 'ワン！ワン！ワン！♪\n（もっと高い音にも挑戦しよう！）', 
+                    challenge: 'ウォーン♪♪\n（音域が広がったよ！まねしてみて！）', 
+                    success: 'ワオーーン！！（完璧だ！一緒に踊ろう！）', 
+                    failure: 'クゥン...（音の高さが違うかも...）' 
                 },
-                tempo: 0.3
+                tempo: 0.35,
+                octaveShift: 1,
+                dance: true
+            },
+            {
+                emotion: 'playful',
+                phrases: [['do', 'do#', 're', 're#', 'mi', 'fa', 'fa#', 'so', 'so#', 'la', 'la#', 'ti']],  // 全ての音
+                dialogue: { 
+                    intro: 'ワン！ワン！ワン！ワン！♪♪♪\n（最後は全部の音を使おう！）', 
+                    challenge: 'ウォーン♪♪♪♪\n（全ての12音で一緒に遊ぼう！）', 
+                    success: 'ワオーーーーン！！（最高だ！！一緒に音楽を楽しもう！）', 
+                    failure: 'クゥン...（あと少し！もう一度！）' 
+                },
+                tempo: 0.3,
+                dance: true
             }
         ]
     };
@@ -923,7 +1191,7 @@ const STORY = {
         3: '第3章へようこそ！\n双子の猫が現れます！\n同時に聞こえる2つの音を聞き分けましょう。\n和音の美しさを感じてください。',
         4: '第4章へようこそ！\n早口猫や魔女猫が登場！\n速さや長さに挑戦しましょう。\n個性豊かな仲間たちが待っています。',
         5: '最終章へようこそ！\nシ♭やファ#など、新しい音も登場します。\n全ての音をマスターしましょう！\nこれは最後の試練です。',
-        6: '裏モードへようこそ！\n全ての音が最初から使えます。\n狂気に満ちた猫たちが待っています...\n彼らは最初は狂ったように見えますが、\n仲間になると驚くほどデレデレになります。'
+        6: '裏モード：平和の世界へようこそ！\n全ての章をクリアし、村に平和が戻りました。\n他所からも様々などうぶつたちが集まってきました。\n輪唱やリズム遊びなど、より音楽的な要素が増えています。\nガルムもご機嫌で、あなたと一緒に遊びたがっています！'
     },
     
     ending: {
@@ -932,7 +1200,7 @@ const STORY = {
         3: 'ガルムは、双子の猫たちに興味を持っていました。\nあなたが奏でたハーモニーが、\nガルムの孤独を癒してくれました。\nこれからは、みんなで一緒に歌えるでしょう...',
         4: 'ガルムは、個性豊かな猫たちに憧れていました。\nあなたがすべての個性を受け入れたように、\nガルムも自分自身を受け入れられるようになりました。\n多様性の美しさを感じています...',
         5: 'ガルムは、全ての音を聞きたかったのです。\nあなたが奏でた12音すべてが、\nガルムの心を満たしてくれました。\nこれで音楽の世界は完成です...\n\n（裏モードが解放されました！）',
-        6: '狂気に満ちていた猫たちも、\nあなたの音楽で心を開きました。\n最初は狂ったように見えた彼らも、\n本当はただ甘えたかっただけだったのです。\n\n全ての音をマスターしたあなたは、\n真の音楽家となりました。\nどうぶつたちは永遠にあなたを忘れないでしょう...'
+        6: '平和が戻った村では、\n様々などうぶつたちが集まってきました。\n輪唱やリズム遊びなど、\n音楽がさらに豊かになっています。\n\nガルムもご機嫌で、\nあなたと一緒に音楽を楽しんでいます。\nこれからも、この平和な世界で\n音楽を奏で続けていきましょう...'
     }
 };
 
@@ -977,6 +1245,13 @@ const CharacterHelper = {
             if (i < notes2.length) combinedNotes.push(notes2[i]);
         }
         return this.compareNotes(playerNotes, combinedNotes);
+    },
+    
+    // 輪唱用：繰り返しパターンで比較
+    compareRoundNotes(playerNotes, phrase) {
+        // フレーズを2回繰り返したパターンと比較
+        const repeatedPhrase = [...phrase, ...phrase];
+        return this.compareNotes(playerNotes, repeatedPhrase);
     },
     
     nextPhrase(character) {

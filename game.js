@@ -584,6 +584,21 @@ class Game {
         this.elements.animalSprite.textContent = character.emoji;
         this.elements.animalName.textContent = character.name;
         
+        // アニメーションクラスを適用
+        this.elements.animalSprite.className = 'animal-sprite';
+        if (character.wobbleAnimation && this.state.currentChapter === 6) {
+            // 裏モードでうろうろするキャラクター
+            this.elements.animalSprite.classList.add('wobbling-dialogue');
+        }
+        if (character.frogJump) {
+            // カエル飛び
+            this.elements.animalSprite.classList.add('frog-jump');
+        }
+        if (character.rabbitHop) {
+            // ウサギ飛び
+            this.elements.animalSprite.classList.add('rabbit-hop');
+        }
+        
         // 再挑戦の場合は別のセリフ
         const greetingText = isRetry 
             ? (character.dialogue.retry || 'ニャ...？\n（もう一度話しかけてきた...）')
@@ -643,7 +658,17 @@ class Game {
             '宇宙': 'witch',
             '半魚人': 'cat',
             '神秘': 'witch',
-            '奇妙': 'cat_energetic'
+            '奇妙': 'cat_energetic',
+            '輪唱・繰り返し': 'cat',
+            'リズム跳ね': 'cat_energetic',
+            '小さい・細かく早い': 'child',
+            '輪唱・小さい': 'child',
+            '熊蜂の飛行': 'cat_energetic',
+            '運命': 'cat',
+            'トルコ行進曲': 'cat_energetic',
+            '威風堂々': 'cat',
+            '大きい・低い': 'wolf',
+            '大きい・高い': 'cat'
         };
         
         return personalityMap[character.personality] || 'cat';
@@ -653,15 +678,24 @@ class Game {
      * キャラクターの位置からパンニング値を計算（-1.0: 左端, 0: 中央, 1.0: 右端）
      */
     getCharacterPan(character) {
-        // キャラクター要素を取得（うろうろ中は現在位置）
+        // 対話画面でのうろうろアニメーション中の場合
+        if (this.state.currentScreen === 'dialogue' && character.wobbleAnimation && this.state.currentChapter === 6) {
+            // アニメーションの進行状況に基づいてパンニングを計算
+            // 現在時刻からアニメーションの位相を計算（3秒周期）
+            const now = Date.now();
+            const phase = (now % 3000) / 3000; // 0-1の範囲
+            // サイン波で左右に動く
+            return Math.sin(phase * Math.PI * 2) * 0.6; // -0.6から0.6の範囲
+        }
+        
+        // 村画面でのうろうろ中
         const charElement = document.querySelector(`.character[data-id="${character.id}"]`);
         if (charElement && character.wobbleAnimation) {
-            // うろうろ中の場合は現在の位置を取得
             const computedStyle = window.getComputedStyle(charElement);
             const leftPercent = parseFloat(computedStyle.left);
-            // 0%を-1.0、50%を0、100%を1.0にマッピング
             return (leftPercent / 50.0) - 1.0;
         }
+        
         // 通常の場合は初期位置から計算
         const x = character.position.x || 50;
         return (x / 50.0) - 1.0;
@@ -675,19 +709,69 @@ class Game {
         if (character.isTwin) {
             // 双子猫：2つのメロディを同時に再生
             await this.playTwinNotes();
+        } else if (character.isRound) {
+            // 輪唱：フレーズを繰り返し再生
+            await this.playRoundNotes(character);
         } else {
             // 通常：1つのメロディを再生
             // うろうろアニメーション中は各音ごとにパンニングを再計算
             const dynamicPan = character.wobbleAnimation;
+            const isBouncyRhythm = character.bouncyRhythm; // リズム跳ね
+            const isOctaveBounce = character.octaveBounce; // 音域跳ね（ウサギ猫など）
             
-            for (const note of this.state.targetNotes) {
+            for (let i = 0; i < this.state.targetNotes.length; i++) {
+                const note = this.state.targetNotes[i];
                 const bubble = this.createNoteBubble(note);
                 this.elements.animalNotes.appendChild(bubble);
                 
                 // パンニングを適用（動的な場合は毎回計算）
                 const pan = dynamicPan ? this.getCharacterPan(character) : this.getCharacterPan(character);
-                await audioSystem.playNote(note, character.tempo * 0.8, character.type || 'cat', pan);
-                await this.delay(character.tempo * 200);
+                
+                // 音域跳ね：音の高さを変える
+                let octaveShift = 0;
+                if (isOctaveBounce) {
+                    // 交互にオクターブを上げる
+                    octaveShift = i % 2 === 1 ? 1 : 0;
+                } else if (character.highPitch) {
+                    // 高い音域のキャラクターは常に1オクターブ上
+                    octaveShift = 1;
+                } else if (character.lowPitch) {
+                    // 低い音域のキャラクターは常に1オクターブ下
+                    octaveShift = -1;
+                }
+                
+                // 熊蜂の飛行：半音階的な上昇下降パターン
+                if (character.bumblebeeFlight) {
+                    // 上昇下降のパターンでオクターブを変える
+                    const patternLength = this.state.targetNotes.length;
+                    const midpoint = Math.floor(patternLength / 2);
+                    if (i < midpoint) {
+                        // 前半：上昇（徐々にオクターブを上げる）
+                        octaveShift = Math.floor((i / midpoint) * 2);
+                    } else {
+                        // 後半：下降（徐々にオクターブを下げる）
+                        const remaining = patternLength - midpoint;
+                        const pos = i - midpoint;
+                        octaveShift = Math.floor((1 - pos / remaining) * 2);
+                    }
+                }
+                
+                // リズム跳ね：音価を変える
+                let noteDuration = character.tempo * 0.8;
+                let noteDelay = character.tempo * 200;
+                if (isBouncyRhythm) {
+                    // 8分音符、8分音符、4分音符のパターン
+                    if (i % 3 === 0 || i % 3 === 1) {
+                        noteDuration = character.tempo * 0.4; // 8分音符
+                        noteDelay = character.tempo * 100;
+                    } else {
+                        noteDuration = character.tempo * 0.8; // 4分音符
+                        noteDelay = character.tempo * 200;
+                    }
+                }
+                
+                await audioSystem.playNote(note, noteDuration, character.type || 'cat', pan, octaveShift);
+                await this.delay(noteDelay);
             }
         }
         
@@ -725,6 +809,39 @@ class Game {
         }
     }
     
+    /**
+     * 輪唱：フレーズを繰り返し再生
+     */
+    async playRoundNotes(character) {
+        const phrase = this.state.targetNotes;
+        const repeatCount = 2;  // 2回繰り返す
+        const highPitch = character.highPitch || false;
+        
+        for (let round = 0; round < repeatCount; round++) {
+            for (let i = 0; i < phrase.length; i++) {
+                const note = phrase[i];
+                const bubble = this.createNoteBubble(note);
+                // 繰り返し回数によって色を変える
+                if (round > 0) {
+                    bubble.style.opacity = '0.7';
+                    bubble.style.border = '2px dashed #888';
+                }
+                this.elements.animalNotes.appendChild(bubble);
+                
+                const pan = this.getCharacterPan(character);
+                // 高い音域の場合はオクターブを上げる、低い音域の場合は下げる
+                let octaveShift = 0;
+                if (highPitch) {
+                    octaveShift = 1;
+                } else if (character.lowPitch) {
+                    octaveShift = -1;
+                }
+                await audioSystem.playNote(note, character.tempo * 0.8, character.type || 'cat', pan, octaveShift);
+                await this.delay(character.tempo * 200);
+            }
+        }
+    }
+    
     createNoteBubble(note) {
         const bubble = document.createElement('div');
         const colorClass = this.getNoteColorClass(note);
@@ -749,9 +866,10 @@ class Game {
     
     async onPianoKeyPress(note) {
         if (this.state.isPlaying) return;
-        if (this.state.playerNotes.length >= 12) return;
+        // 入力上限を30に増やす（長いフレーズに対応）
+        if (this.state.playerNotes.length >= 30) return;
         
-        await audioSystem.playNote(note, 0.3, 'player');
+        await audioSystem.playNote(note, 0.3, 'player', 0, 0);
         
         this.state.playerNotes.push(note);
         
@@ -790,6 +908,12 @@ class Game {
                 this.state.targetNotes,
                 this.state.twinTargetNotes
             );
+        } else if (character.isRound) {
+            // 輪唱の場合：繰り返しパターンで比較
+            isCorrect = CharacterHelper.compareRoundNotes(
+                this.state.playerNotes,
+                this.state.targetNotes
+            );
         } else {
             isCorrect = CharacterHelper.compareNotes(
                 this.state.playerNotes,
@@ -801,7 +925,7 @@ class Game {
         
         // プレイヤーの音を再生
         for (const note of this.state.playerNotes) {
-            await audioSystem.playNote(note, 0.3, 'player');
+            await audioSystem.playNote(note, 0.3, 'player', 0, 0);
             await this.delay(100);
         }
         
@@ -914,7 +1038,9 @@ class Game {
         this.renderPianoKeyboard(this.elements.wolfPianoKeyboard, true);
         
         this.elements.wolfSprite.textContent = wolf.emoji;
-        this.elements.wolfSprite.className = `wolf-sprite ${phase.emotion}`;
+        // 遊びモードの場合はplayfulクラスを使用
+        const emotionClass = phase.emotion === 'playful' ? 'playful' : phase.emotion;
+        this.elements.wolfSprite.className = `wolf-sprite ${emotionClass}`;
         this.elements.wolfDialogueText.textContent = phase.dialogue.intro;
         this.elements.wolfPhase.textContent = `フェーズ ${wolf.currentPhase + 1}/${wolf.phases.length}`;
         
@@ -929,6 +1055,9 @@ class Game {
         
         await this.delay(1000);
         if (phase.emotion === 'angry') {
+            await audioSystem.playWolfHowl();
+        } else if (phase.emotion === 'playful' && this.state.currentChapter === 6) {
+            // 裏モードの遊びモードでは軽快な遠吠え
             await audioSystem.playWolfHowl();
         }
         
@@ -948,12 +1077,40 @@ class Game {
         this.elements.wolfNotes.innerHTML = '';
         this.state.isPlaying = true;
         
-        for (const note of this.state.targetNotes) {
+        // ダンスアニメーション（裏モードの場合）
+        if (phase.dance && this.state.currentChapter === 6) {
+            this.elements.wolfSprite.classList.add('wolf-dancing');
+        }
+        
+        // オクターブシフトと跳ねるリズムに対応
+        const octaveShift = phase.octaveShift || 0;
+        const isBouncy = phase.bouncyRhythm || false;
+        
+        for (let i = 0; i < this.state.targetNotes.length; i++) {
+            const note = this.state.targetNotes[i];
             const bubble = this.createNoteBubble(note);
+            
+            // オクターブが上がる場合は表示を変更
+            if (octaveShift > 0 && i >= this.state.targetNotes.length / 2) {
+                bubble.classList.add('high-note');
+            }
+            
             this.elements.wolfNotes.appendChild(bubble);
             
-            await audioSystem.playNote(note, phase.tempo * 0.8, 'wolf');
-            await this.delay(phase.tempo * 200);
+            // オクターブシフトを適用して再生
+            const currentOctaveShift = octaveShift > 0 && i >= this.state.targetNotes.length / 2 ? octaveShift : 0;
+            await audioSystem.playNote(note, phase.tempo * 0.8, 'wolf', 0, currentOctaveShift);
+            
+            // 跳ねるリズムの場合は遅延を変える
+            const delay = isBouncy && i % 2 === 1 
+                ? phase.tempo * 150  // 短く
+                : phase.tempo * 250; // 長く
+            await this.delay(delay);
+        }
+        
+        // ダンスアニメーションを解除
+        if (phase.dance) {
+            this.elements.wolfSprite.classList.remove('wolf-dancing');
         }
         
         this.state.isPlaying = false;
@@ -961,9 +1118,10 @@ class Game {
     
     async onWolfPianoKeyPress(note) {
         if (this.state.isPlaying) return;
-        if (this.state.playerNotes.length >= 12) return;
+        // 入力上限を30に増やす（長いフレーズに対応）
+        if (this.state.playerNotes.length >= 30) return;
         
-        await audioSystem.playNote(note, 0.3, 'player');
+        await audioSystem.playNote(note, 0.3, 'player', 0, 0);
         
         this.state.playerNotes.push(note);
         
@@ -1003,14 +1161,14 @@ class Game {
         this.state.isPlaying = true;
         
         for (const note of this.state.playerNotes) {
-            await audioSystem.playNote(note, 0.3, 'player');
+            await audioSystem.playNote(note, 0.3, 'player', 0, 0);
             await this.delay(100);
         }
         
         await this.delay(500);
         
         // 狼の感情に応じた音声タイプ
-        const wolfVoiceType = `wolf_${phase.emotion}`;
+        const wolfVoiceType = phase.emotion === 'playful' ? 'wolf_happy' : `wolf_${phase.emotion}`;
         
         if (isCorrect) {
             await audioSystem.playSuccessSound();
@@ -1034,14 +1192,18 @@ class Game {
             wolf.retryCount++;
             
             this.elements.wolfDialogueText.textContent = phase.dialogue.failure;
-            this.elements.wolfSprite.className = `wolf-sprite angry`;
+            // 遊びモードの場合はplayfulを維持
+            if (phase.emotion !== 'playful') {
+                this.elements.wolfSprite.className = `wolf-sprite angry`;
+            }
             await this.speakText(phase.dialogue.failure, 'wolf_angry');  // 失敗時は怒った声
             
             await this.delay(1500);
             
             this.state.playerNotes = [];
             this.elements.wolfPlayerNotes.innerHTML = '';
-            this.elements.wolfSprite.className = `wolf-sprite ${phase.emotion}`;
+            const emotionClass = phase.emotion === 'playful' ? 'playful' : phase.emotion;
+            this.elements.wolfSprite.className = `wolf-sprite ${emotionClass}`;
             this.elements.wolfDialogueText.textContent = phase.dialogue.challenge;
             
             await this.delay(500);

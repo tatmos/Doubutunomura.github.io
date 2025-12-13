@@ -881,6 +881,55 @@ body {
     50% { transform: translateY(-15px); }
 }
 
+/* 対話画面でのうろうろアニメーション */
+.animal-sprite.wobbling-dialogue {
+    animation: wobbleDialogue 3s ease-in-out infinite !important;
+}
+
+@keyframes wobbleDialogue {
+    0%, 100% { 
+        transform: translateX(0) translateY(0); 
+    }
+    25% { 
+        transform: translateX(40px) translateY(-10px); 
+    }
+    50% { 
+        transform: translateX(0) translateY(-20px); 
+    }
+    75% { 
+        transform: translateX(-40px) translateY(-10px); 
+    }
+}
+
+/* カエル飛びアニメーション */
+.animal-sprite.frog-jump {
+    animation: frogJump 1.5s ease-in-out infinite;
+}
+
+@keyframes frogJump {
+    0%, 100% { transform: translateY(0) translateX(0); }
+    25% { transform: translateY(-30px) translateX(10px); }
+    50% { transform: translateY(-50px) translateX(20px); }
+    75% { transform: translateY(-30px) translateX(10px); }
+}
+
+/* ウサギ飛びアニメーション */
+.animal-sprite.rabbit-hop {
+    animation: rabbitHop 0.8s ease-in-out infinite;
+}
+
+@keyframes rabbitHop {
+    0%, 100% { transform: translateY(0) scaleY(1); }
+    30% { transform: translateY(-40px) scaleY(0.9); }
+    50% { transform: translateY(-50px) scaleY(1.1); }
+    70% { transform: translateY(-40px) scaleY(0.9); }
+}
+
+.note-bubble.high-note {
+    border: 3px solid #ffd700;
+    box-shadow: 0 0 15px rgba(255, 215, 0, 0.6);
+}
+
 .animal-name {
     font-size: 1.5rem;
     font-weight: 700;
@@ -1240,10 +1289,27 @@ body {
     filter: drop-shadow(0 0 20px rgba(255, 215, 0, 0.5));
 }
 
+.wolf-sprite.playful {
+    animation: wolfHappy 1s ease-in-out infinite;
+    filter: drop-shadow(0 0 20px rgba(255, 215, 0, 0.5));
+}
+
+.wolf-sprite.wolf-dancing {
+    animation: wolfDance 0.8s ease-in-out infinite;
+    filter: drop-shadow(0 0 30px rgba(255, 215, 0, 0.8));
+}
+
 @keyframes wolfHappy {
     0%, 100% { transform: scale(1) rotate(0deg); }
     25% { transform: scale(1.05) rotate(-2deg); }
     75% { transform: scale(1.05) rotate(2deg); }
+}
+
+@keyframes wolfDance {
+    0%, 100% { transform: translateY(0) rotate(0deg) scale(1); }
+    25% { transform: translateY(-10px) rotate(-5deg) scale(1.05); }
+    50% { transform: translateY(-20px) rotate(0deg) scale(1.1); }
+    75% { transform: translateY(-10px) rotate(5deg) scale(1.05); }
 }
 
 .wolf-dialogue-box {

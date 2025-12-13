@@ -284,17 +284,18 @@ class AudioSystem {
     }
     
     /**
-     * 単音を再生（ピアノ音色対応 + パンニング対応）
+     * 単音を再生（ピアノ音色対応 + パンニング対応 + オクターブシフト対応）
      * @param {number} pan - パンニング値（-1.0: 左, 0: 中央, 1.0: 右）
+     * @param {number} octaveShift - オクターブシフト（1で1オクターブ上、-1で1オクターブ下）
      */
-    playNote(note, duration = 0.4, character = 'player', pan = 0) {
+    playNote(note, duration = 0.4, character = 'player', pan = 0, octaveShift = 0) {
         return new Promise((resolve) => {
             if (!this.isInitialized || !this.frequencies[note]) {
                 resolve();
                 return;
             }
             
-            const baseFreq = this.frequencies[note];
+            const baseFreq = this.frequencies[note] * Math.pow(2, octaveShift);
             const instrument = this.instruments[character] || this.instruments.player;
             const now = this.audioContext.currentTime;
             
@@ -566,7 +567,7 @@ class AudioSystem {
         } else {
             // 通常の再生（各音を個別に）
             for (const note of notes) {
-                await this.playNote(note, tempo * 0.8, character);
+                await this.playNote(note, tempo * 0.8, character, 0, 0);
                 await this.delay(tempo * 0.2);
             }
         }
@@ -700,7 +701,7 @@ class AudioSystem {
     async playChapterStart() {
         const notes = ['so', 'do', 'mi', 'so'];
         for (const note of notes) {
-            await this.playNote(note, 0.2);
+            await this.playNote(note, 0.2, 'player', 0, 0);
             await this.delay(0.05);
         }
     }
