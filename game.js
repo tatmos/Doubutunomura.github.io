@@ -28,6 +28,7 @@ class Game {
         this.screens = {};
         this.elements = {};
         this.village3D = null;  // 3D村システム
+        this.forestPath3D = null;  // 3D森の道システム
         
         this.init();
     }
@@ -40,6 +41,7 @@ class Game {
             village: document.getElementById('village-screen'),
             dialogue: document.getElementById('dialogue-screen'),
             result: document.getElementById('result-screen'),
+            forestPath: document.getElementById('forest-path-screen'),
             wolf: document.getElementById('wolf-screen'),
             ending: document.getElementById('ending-screen')
         };
@@ -74,7 +76,9 @@ class Game {
             pianoKeyboard: document.getElementById('piano-keyboard'),
             wolfPianoKeyboard: document.getElementById('wolf-piano-keyboard'),
             speechToggle: document.getElementById('speech-toggle'),
-            forestEntrance3D: document.getElementById('forest-entrance-3d')
+            forestEntrance3D: document.getElementById('forest-entrance-3d'),
+            forestPathCanvas: document.getElementById('forest-path-canvas'),
+            forestPathMessage: document.getElementById('forest-path-message')
         };
         
         this.setupEventListeners();
@@ -1619,7 +1623,17 @@ class Game {
             return;
         }
         
-        this.startWolfBattle();
+        // 3D村を停止
+        if (this.village3D) {
+            this.village3D.pauseAnimation();
+        }
+        
+        // 森の道シーンを開始
+        this.showScreen('forestPath');
+        if (!this.forestPath3D) {
+            this.forestPath3D = new ForestPath3D(this.elements.forestPathCanvas, this);
+        }
+        this.forestPath3D.init();
     }
     
     async startWolfBattle() {
@@ -3051,6 +3065,19 @@ class Village3D {
         this.renderer.setSize(window.innerWidth, window.innerHeight);
     }
     
+    pauseAnimation() {
+        if (this.animationId) {
+            cancelAnimationFrame(this.animationId);
+            this.animationId = null;
+        }
+    }
+    
+    resumeAnimation() {
+        if (!this.animationId && this.game.state.currentScreen === 'village') {
+            this.animate();
+        }
+    }
+    
     destroy() {
         try {
             if (this.animationId) {
@@ -3105,6 +3132,278 @@ class Village3D {
         } catch (error) {
             console.error('Village3D破棄エラー:', error);
         }
+    }
+}
+
+/**
+ * 森の道3Dシーン
+ */
+class ForestPath3D {
+    constructor(canvas, game) {
+        this.canvas = canvas;
+        this.game = game;
+        this.scene = null;
+        this.camera = null;
+        this.renderer = null;
+        this.player = null;
+        this.wolf = null;
+        this.trees = [];
+        this.animationId = null;
+        this.playerSpeed = 0.15;
+        this.pathLength = 50;  // 道の長さ
+        this.playerPosition = 0;  // プレイヤーの位置（道の始まりから）
+    }
+    
+    init() {
+        if (!this.canvas) {
+            throw new Error('キャンバス要素が設定されていません');
+        }
+        
+        if (typeof THREE === 'undefined') {
+            throw new Error('Three.jsが読み込まれていません');
+        }
+        
+        try {
+            // Three.jsシーンを初期化
+            this.scene = new THREE.Scene();
+            this.scene.background = new THREE.Color(0x1a3d1a); // 暗い緑色（森の雰囲気）
+            
+            // カメラ設定
+            const aspect = window.innerWidth / window.innerHeight;
+            this.camera = new THREE.PerspectiveCamera(75, aspect, 0.1, 1000);
+            this.camera.position.set(0, 5, 10);
+            this.camera.lookAt(0, 0, 0);
+            
+            // レンダラー設定
+            this.renderer = new THREE.WebGLRenderer({ 
+                canvas: this.canvas,
+                antialias: true 
+            });
+            this.renderer.setSize(window.innerWidth, window.innerHeight);
+            this.renderer.shadowMap.enabled = true;
+            
+            // ライト設定（暗めの森の雰囲気）
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.3);
+            this.scene.add(ambientLight);
+            
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
+            directionalLight.position.set(5, 10, 5);
+            directionalLight.castShadow = true;
+            this.scene.add(directionalLight);
+            
+            // 地面を作成
+            this.createGround();
+            
+            // 道を作成
+            this.createPath();
+            
+            // 木々を配置
+            this.createTrees();
+            
+            // プレイヤーを作成
+            this.createPlayer();
+            
+            // ガルムを作成
+            this.createWolf();
+            
+            // アニメーションループを開始
+            this.animate();
+        } catch (error) {
+            console.error('ForestPath3D初期化エラー:', error);
+            throw error;
+        }
+    }
+    
+    createGround() {
+        // 地面（草）
+        const groundGeometry = new THREE.PlaneGeometry(30, this.pathLength, 10, 50);
+        const groundMaterial = new THREE.MeshLambertMaterial({ color: 0x2d5a2d });
+        const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+        ground.rotation.x = -Math.PI / 2;
+        ground.position.z = -this.pathLength / 2;
+        ground.receiveShadow = true;
+        this.scene.add(ground);
+    }
+    
+    createPath() {
+        // 一本道
+        const pathMaterial = new THREE.MeshLambertMaterial({ color: 0x5a4a3a });
+        const pathGeometry = new THREE.PlaneGeometry(3, this.pathLength, 1, 50);
+        const path = new THREE.Mesh(pathGeometry, pathMaterial);
+        path.rotation.x = -Math.PI / 2;
+        path.position.y = 0.02;
+        path.position.z = -this.pathLength / 2;
+        this.scene.add(path);
+    }
+    
+    createTrees() {
+        // 左右に木々を配置
+        const treeCount = 40;
+        
+        for (let i = 0; i < treeCount; i++) {
+            // 左側の木
+            const leftTree = this.createTree();
+            const leftX = -5 - Math.random() * 8;
+            const leftZ = -this.pathLength / 2 + (i / treeCount) * this.pathLength + Math.random() * 2;
+            leftTree.position.set(leftX, 0, leftZ);
+            this.scene.add(leftTree);
+            this.trees.push(leftTree);
+            
+            // 右側の木
+            const rightTree = this.createTree();
+            const rightX = 5 + Math.random() * 8;
+            const rightZ = -this.pathLength / 2 + (i / treeCount) * this.pathLength + Math.random() * 2;
+            rightTree.position.set(rightX, 0, rightZ);
+            this.scene.add(rightTree);
+            this.trees.push(rightTree);
+        }
+    }
+    
+    createTree() {
+        const tree = new THREE.Group();
+        
+        // 幹
+        const trunkGeometry = new THREE.CylinderGeometry(0.4, 0.5, 4, 8);
+        const trunkMaterial = new THREE.MeshLambertMaterial({ color: 0x4a3d2d });
+        const trunk = new THREE.Mesh(trunkGeometry, trunkMaterial);
+        trunk.position.y = 2;
+        trunk.castShadow = true;
+        tree.add(trunk);
+        
+        // 葉（複数段でより森らしく）
+        const leavesGeometry = new THREE.ConeGeometry(2.5, 4, 8);
+        const leavesMaterial = new THREE.MeshLambertMaterial({ color: 0x1a4a1a });
+        const leaves1 = new THREE.Mesh(leavesGeometry, leavesMaterial);
+        leaves1.position.y = 5;
+        leaves1.castShadow = true;
+        tree.add(leaves1);
+        
+        const leaves2 = new THREE.Mesh(leavesGeometry, leavesMaterial);
+        leaves2.position.y = 6.5;
+        leaves2.scale.set(0.8, 0.8, 0.8);
+        leaves2.castShadow = true;
+        tree.add(leaves2);
+        
+        return tree;
+    }
+    
+    createPlayer() {
+        // プレイヤー（道の始まりに配置）
+        const geometry = new THREE.BoxGeometry(0.8, 1.6, 0.8);
+        const material = new THREE.MeshLambertMaterial({ color: 0x4a90c2 });
+        this.player = new THREE.Mesh(geometry, material);
+        this.player.position.set(0, 0.8, -this.pathLength / 2);
+        this.player.castShadow = true;
+        this.scene.add(this.player);
+        
+        // マーカー
+        const markerGeometry = new THREE.ConeGeometry(0.3, 0.5, 4);
+        const markerMaterial = new THREE.MeshLambertMaterial({ color: 0xffd700 });
+        const marker = new THREE.Mesh(markerGeometry, markerMaterial);
+        marker.position.y = 1.2;
+        this.player.add(marker);
+    }
+    
+    createWolf() {
+        // ガルム（道の終わりに配置）
+        const wolfGroup = new THREE.Group();
+        
+        // 体
+        const bodyGeometry = new THREE.SphereGeometry(1.2, 16, 16);
+        const bodyMaterial = new THREE.MeshLambertMaterial({ color: 0x8b7355 });
+        const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+        body.castShadow = true;
+        wolfGroup.add(body);
+        
+        // 頭
+        const headGeometry = new THREE.SphereGeometry(0.8, 16, 16);
+        const head = new THREE.Mesh(headGeometry, bodyMaterial);
+        head.position.set(0, 1, 0.8);
+        head.castShadow = true;
+        wolfGroup.add(head);
+        
+        // 目（光る）
+        const eyeMaterial = new THREE.MeshLambertMaterial({ 
+            color: 0xff0000,
+            emissive: 0xff0000,
+            emissiveIntensity: 0.5
+        });
+        const eyeGeometry = new THREE.SphereGeometry(0.15, 8, 8);
+        const leftEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
+        leftEye.position.set(-0.3, 1.1, 1.4);
+        wolfGroup.add(leftEye);
+        
+        const rightEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
+        rightEye.position.set(0.3, 1.1, 1.4);
+        wolfGroup.add(rightEye);
+        
+        // 位置設定（道の終わり）
+        wolfGroup.position.set(0, 1, this.pathLength / 2 - 5);
+        this.scene.add(wolfGroup);
+        this.wolf = wolfGroup;
+    }
+    
+    animate() {
+        this.animationId = requestAnimationFrame(() => this.animate());
+        
+        // プレイヤーを自動的に前進させる
+        if (this.player && this.playerPosition < this.pathLength - 5) {
+            this.playerPosition += this.playerSpeed;
+            this.player.position.z = -this.pathLength / 2 + this.playerPosition;
+            
+            // カメラをプレイヤーに追従
+            this.camera.position.z = this.player.position.z + 10;
+            this.camera.lookAt(this.player.position);
+            
+            // ガルムに近づいたら対話シーンへ
+            const distanceToWolf = this.pathLength / 2 - 5 - this.playerPosition;
+            if (distanceToWolf < 2) {
+                this.pauseAnimation();
+                setTimeout(() => {
+                    this.game.startWolfBattle();
+                }, 1000);
+            }
+        }
+        
+        // ガルムのアニメーション（少し動かす）
+        if (this.wolf) {
+            this.wolf.rotation.y += 0.01;
+            this.wolf.position.y = 1 + Math.sin(Date.now() * 0.001) * 0.1;
+        }
+        
+        // 木々を少し揺らす
+        this.trees.forEach((tree, index) => {
+            tree.rotation.y = Math.sin(Date.now() * 0.0005 + index) * 0.05;
+        });
+        
+        if (this.renderer && this.scene && this.camera) {
+            this.renderer.render(this.scene, this.camera);
+        }
+    }
+    
+    pauseAnimation() {
+        if (this.animationId) {
+            cancelAnimationFrame(this.animationId);
+            this.animationId = null;
+        }
+    }
+    
+    destroy() {
+        this.pauseAnimation();
+        
+        if (this.scene) {
+            while(this.scene.children.length > 0) {
+                this.scene.remove(this.scene.children[0]);
+            }
+        }
+        
+        if (this.renderer) {
+            this.renderer.dispose();
+            this.renderer = null;
+        }
+        
+        this.scene = null;
+        this.camera = null;
     }
 }
 
