@@ -53,28 +53,9 @@
             </div>
         </div>
 
-        <!-- 村のマップ画面 -->
+        <!-- 村のマップ画面（3D） -->
         <div id="village-screen" class="screen">
-            <div class="village-bg">
-                <div class="sky"></div>
-                <div class="sun"></div>
-                <div class="clouds">
-                    <div class="cloud cloud1"></div>
-                    <div class="cloud cloud2"></div>
-                    <div class="cloud cloud3"></div>
-                </div>
-                <div class="ground"></div>
-                <div class="trees">
-                    <div class="tree tree1"></div>
-                    <div class="tree tree2"></div>
-                    <div class="tree tree3"></div>
-                </div>
-                <div class="forest-entrance">
-                    <div class="dark-forest"></div>
-                    <span class="forest-label">深い森へ...</span>
-                </div>
-            </div>
-            <div id="characters-container"></div>
+            <canvas id="village-3d-canvas"></canvas>
             <div id="village-ui">
                 <div class="chapter-indicator">
                     <span id="current-chapter-name">第1章</span>
@@ -87,7 +68,11 @@
                     <!-- 覚えた音符を表示 -->
                 </div>
                 <div class="message-box" id="village-message">
-                    村のなかまたちに あいさつしよう！
+                    村のなかまたちに あいさつしよう！<br>
+                    <small>PC: WASD/矢印キーで移動、マウスで視点変更<br>スマホ: 画面をタッチして移動、画面上部をタッチして視点変更</small>
+                </div>
+                <div class="forest-entrance-3d" id="forest-entrance-3d">
+                    <div class="forest-label-3d">深い森へ...</div>
                 </div>
             </div>
         </div>
@@ -195,8 +180,20 @@
         </div>
     </div>
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" 
+            onerror="console.error('Three.jsの読み込みに失敗しました')"></script>
     <script src="audio.js"></script>
     <script src="characters.js"></script>
+    <script>
+        // Three.jsが読み込まれたか確認
+        window.addEventListener('load', () => {
+            if (typeof THREE === 'undefined') {
+                console.error('Three.jsが読み込まれていません');
+            } else {
+                console.log('Three.js読み込み成功:', THREE.REVISION);
+            }
+        });
+    </script>
     <script src="game.js"></script>
 </body>
 </html>

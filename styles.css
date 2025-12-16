@@ -489,17 +489,26 @@ body {
 }
 
 /* ============================================
-   村のマップ画面
+   村のマップ画面（3D）
    ============================================ */
 #village-screen {
     background: var(--color-sky-day);
+    position: relative;
+    overflow: hidden;
 }
 
-.village-bg {
+#village-3d-canvas {
     position: absolute;
+    top: 0;
+    left: 0;
     width: 100%;
     height: 100%;
-    overflow: hidden;
+    display: block;
+    cursor: grab;
+}
+
+#village-3d-canvas:active {
+    cursor: grabbing;
 }
 
 .sky {
@@ -667,6 +676,7 @@ body {
     height: 200px;
     cursor: pointer;
     transition: all var(--transition-medium);
+    display: none; /* 3D版では非表示 */
 }
 
 .dark-forest {
@@ -697,11 +707,38 @@ body {
     opacity: 1;
 }
 
+/* 3D版の森の入り口 */
+.forest-entrance-3d {
+    position: absolute;
+    bottom: 20px;
+    right: 20px;
+    padding: 15px 25px;
+    background: rgba(26, 47, 26, 0.8);
+    border-radius: 15px;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    z-index: 100;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+}
+
+.forest-entrance-3d:hover {
+    background: rgba(26, 47, 26, 0.95);
+    transform: scale(1.05);
+}
+
+.forest-label-3d {
+    color: var(--color-text-light);
+    font-size: 1rem;
+    font-weight: 700;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+}
+
 #characters-container {
     position: absolute;
     width: 100%;
     height: 100%;
     pointer-events: none;
+    display: none; /* 3D版では非表示 */
 }
 
 .character {

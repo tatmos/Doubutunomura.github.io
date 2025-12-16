@@ -27,6 +27,7 @@ class Game {
         
         this.screens = {};
         this.elements = {};
+        this.village3D = null;  // 3D村システム
         
         this.init();
     }
@@ -49,6 +50,7 @@ class Game {
             friendCount: document.getElementById('friend-count'),
             totalCats: document.getElementById('total-cats'),
             charactersContainer: document.getElementById('characters-container'),
+            village3DCanvas: document.getElementById('village-3d-canvas'),
             animalSprite: document.getElementById('animal-sprite'),
             animalName: document.getElementById('animal-name'),
             animalNotes: document.getElementById('animal-notes'),
@@ -71,7 +73,8 @@ class Game {
             learnedNotesDisplay: document.getElementById('learned-notes-display'),
             pianoKeyboard: document.getElementById('piano-keyboard'),
             wolfPianoKeyboard: document.getElementById('wolf-piano-keyboard'),
-            speechToggle: document.getElementById('speech-toggle')
+            speechToggle: document.getElementById('speech-toggle'),
+            forestEntrance3D: document.getElementById('forest-entrance-3d')
         };
         
         this.setupEventListeners();
@@ -129,10 +132,12 @@ class Game {
             this.submitWolfAnswer();
         });
         
-        // 森の入り口
-        document.querySelector('.forest-entrance').addEventListener('click', () => {
-            this.enterForest();
-        });
+        // 森の入り口（3D版）
+        if (this.elements.forestEntrance3D) {
+            this.elements.forestEntrance3D.addEventListener('click', () => {
+                this.enterForest();
+            });
+        }
         
         // エンディング
         document.getElementById('restart-btn').addEventListener('click', () => {
@@ -608,10 +613,63 @@ class Game {
         
         this.elements.currentChapterName.textContent = chapter.title;
         this.elements.totalCats.textContent = chapterData.cats.length;
-        this.elements.villageMessage.textContent = STORY.villageIntro;
+        this.elements.villageMessage.innerHTML = STORY.villageIntro + '<br><small>PC: WASD/矢印キーで移動、マウスで視点変更<br>スマホ: 画面をタッチして移動、画面上部をタッチして視点変更</small>';
         
-        this.renderPianoKeyboard(this.elements.pianoKeyboard);
-        this.renderCharacters();
+        // 3D村を初期化（エラーハンドリング付き）
+        try {
+            // Three.jsが読み込まれているか確認
+            if (typeof THREE === 'undefined') {
+                console.error('Three.jsが読み込まれていません');
+                this.elements.villageMessage.innerHTML = 'エラー: Three.jsが読み込まれていません。<br>ページを再読み込みしてください。<br><small>（インターネット接続を確認してください）</small>';
+                // フォールバック: 2D表示に戻す
+                this.renderCharacters();
+                return;
+            }
+            
+            // キャンバス要素が存在するか確認
+            if (!this.elements.village3DCanvas) {
+                console.error('3Dキャンバス要素が見つかりません');
+                this.elements.villageMessage.innerHTML = 'エラー: 3Dキャンバスが見つかりません。';
+                // フォールバック: 2D表示に戻す
+                this.renderCharacters();
+                return;
+            }
+            
+            // キャンバスのコンテキストが取得できるか確認
+            const testContext = this.elements.village3DCanvas.getContext('webgl') || 
+                              this.elements.village3DCanvas.getContext('webgl2');
+            if (!testContext) {
+                console.warn('WebGLがサポートされていません。2D表示にフォールバックします。');
+                this.elements.villageMessage.innerHTML = 'WebGLがサポートされていません。<br>2D表示で続行します。';
+                this.renderCharacters();
+                return;
+            }
+            
+            // 既存の3Dシーンを破棄
+            if (this.village3D) {
+                try {
+                    this.village3D.destroy();
+                } catch (e) {
+                    console.warn('既存の3Dシーンの破棄中にエラー:', e);
+                }
+                this.village3D = null;
+            }
+            
+            // 3D村を初期化
+            this.village3D = new Village3D(this.elements.village3DCanvas, this);
+            this.village3D.init(chapterData.cats, this.state.friends, this.state.escapedCats);
+        } catch (error) {
+            console.error('3D村の初期化エラー:', error);
+            console.error('エラースタック:', error.stack);
+            this.elements.villageMessage.innerHTML = `エラーが発生しました: ${error.message}<br>ページを再読み込みしてください。<br><small>詳細: ${error.stack || 'スタック情報なし'}</small>`;
+            // フォールバック: 2D表示に戻す
+            try {
+                this.renderCharacters();
+            } catch (e) {
+                console.error('2D表示へのフォールバックも失敗:', e);
+            }
+        }
+        
         this.updateFriendCount();
         this.updateLearnedNotesDisplay();
     }
@@ -809,8 +867,58 @@ class Game {
     
     // ===== 対話 =====
     async startDialogue(character, isRetry = false) {
+        // 3Dシーンのアニメーションを停止
+        if (this.village3D) {
+            this.village3D.isDialogueActive = true;
+            if (this.village3D.animationId) {
+                cancelAnimationFrame(this.village3D.animationId);
+                this.village3D.animationId = null;
+            }
+        }
+        
         this.state.currentCharacter = character;
         this.state.playerNotes = [];
+        
+        // 門番猫の場合は会話のみ（音入力なし）
+        if (character.id === 'gate_keeper') {
+            this.showScreen('dialogue');
+            this.renderPianoKeyboard(this.elements.pianoKeyboard);
+            
+            this.elements.animalSprite.textContent = character.emoji;
+            this.elements.animalName.textContent = character.name;
+            this.elements.animalSprite.className = 'animal-sprite';
+            
+            const greetingText = character.dialogue.greeting;
+            this.elements.dialogueText.textContent = greetingText;
+            
+            this.elements.animalNotes.innerHTML = '';
+            this.elements.playerNotes.innerHTML = '';
+            
+            // ピアノキーボードを非表示
+            if (this.elements.pianoKeyboard) {
+                this.elements.pianoKeyboard.style.display = 'none';
+            }
+            
+            // キャラクターの個性に応じた音声タイプを選択
+            const voiceType = this.getCharacterVoiceType(character);
+            await this.speakText(greetingText, voiceType);
+            
+            // 門番猫の場合は自動的に結果画面へ（音入力なし）
+            const chapterData = CHAPTER_CHARACTERS[this.state.currentChapter];
+            const totalCats = chapterData ? chapterData.cats.length : 0;
+            const friendCount = this.state.friends.length;
+            
+            if (friendCount >= totalCats) {
+                // 全ての猫となかまになっている場合は成功
+                await this.delay(2000);
+                this.showResult(true, character);
+            } else {
+                // まだ足りない場合は失敗
+                await this.delay(2000);
+                this.showResult(false, character);
+            }
+            return;
+        }
         
         // 再挑戦の場合、逃げたリストから削除してフレーズを変更
         if (isRetry) {
@@ -839,6 +947,11 @@ class Game {
         
         this.showScreen('dialogue');
         this.renderPianoKeyboard(this.elements.pianoKeyboard);
+        
+        // ピアノキーボードを表示
+        if (this.elements.pianoKeyboard) {
+            this.elements.pianoKeyboard.style.display = 'flex';
+        }
         
         this.elements.animalSprite.textContent = character.emoji;
         this.elements.animalName.textContent = character.name;
@@ -1379,7 +1492,12 @@ class Game {
             // 成功時は嬉しい声（感情分析でさらに調整される）
             await this.speakText(character.dialogue.success, voiceType);
         } else {
-            this.elements.resultTitle.textContent = 'にげられた...';
+            // 門番猫の場合は「にげられた」ではなく別のメッセージ
+            if (character.id === 'gate_keeper') {
+                this.elements.resultTitle.textContent = '通してもらえないようだ';
+            } else {
+                this.elements.resultTitle.textContent = 'にげられた...';
+            }
             this.elements.resultTitle.className = 'failure';
             this.elements.resultMessage.textContent = character.dialogue.failure;
             this.elements.learnedNoteDisplay.classList.remove('show');
@@ -1392,24 +1510,101 @@ class Game {
     continueFromResult() {
         const chapterData = CHAPTER_CHARACTERS[this.state.currentChapter];
         
+        // 門番猫との会話で全ての猫となかまになっている場合は森へ
+        if (this.state.currentCharacter && this.state.currentCharacter.id === 'gate_keeper') {
+            if (this.state.friends.length >= chapterData.cats.length) {
+                // 森へ進む
+                this.enterForest();
+                return;
+            }
+        }
+        
+        // 会話に失敗した場合の処理
+        const lastCharacter = this.state.currentCharacter;
+        const wasFailure = lastCharacter && (
+            this.state.escapedCats.includes(lastCharacter.id) || 
+            (lastCharacter.id === 'gate_keeper' && this.state.friends.length < chapterData.cats.length)
+        );
+        
         this.showScreen('village');
-        this.renderCharacters();
+        
+        // 3D村を更新
+        if (this.village3D) {
+            // 会話フラグをリセット
+            this.village3D.isDialogueActive = false;
+            
+            // 失敗した場合は、プレイヤーと猫を離す
+            if (wasFailure && lastCharacter && this.village3D.player) {
+                // 失敗した猫のIDを記録
+                this.village3D.lastFailedCatId = lastCharacter.id;
+                this.village3D.lastFailedTime = Date.now();
+                
+                // プレイヤーを少し後ろに移動（猫から離す）
+                const playerPos = this.village3D.player.position.clone();
+                const backward = new THREE.Vector3(0, 0, 2);  // 後ろに2ユニット
+                playerPos.add(backward);
+                
+                // 境界チェック
+                const boundary = 20;
+                playerPos.x = Math.max(-boundary, Math.min(boundary, playerPos.x));
+                playerPos.z = Math.max(-boundary, Math.min(boundary, playerPos.z));
+                
+                this.village3D.player.position.copy(playerPos);
+                this.village3D.playerLastPosition.copy(playerPos);
+                
+                // クールダウンを延長（失敗した場合は5秒）
+                this.village3D.lastInteractionTime = Date.now();
+                this.village3D.interactionCooldown = 5000;
+            }
+            
+            this.village3D.createCats(chapterData.cats, this.state.friends, this.state.escapedCats);
+            
+            // 失敗した猫を少し離れた場所に移動（門番猫の場合は位置変更不要）
+            if (wasFailure && lastCharacter && lastCharacter.id !== 'gate_keeper' && this.village3D.cats) {
+                const failedCat = this.village3D.cats.find(cat => cat.data.id === lastCharacter.id);
+                if (failedCat && failedCat.mesh) {
+                    // 猫を少し離れた場所に移動（ランダムな方向に）
+                    const angle = Math.random() * Math.PI * 2;
+                    const distance = 4;  // 4ユニット離す
+                    const offset = new THREE.Vector3(
+                        Math.cos(angle) * distance,
+                        0,
+                        Math.sin(angle) * distance
+                    );
+                    const newPos = this.village3D.player.position.clone().add(offset);
+                    
+                    // 境界チェック
+                    const boundary = 20;
+                    newPos.x = Math.max(-boundary, Math.min(boundary, newPos.x));
+                    newPos.z = Math.max(-boundary, Math.min(boundary, newPos.z));
+                    
+                    failedCat.mesh.position.copy(newPos);
+                    failedCat.position.copy(newPos);
+                }
+            }
+            
+            // アニメーションを再開
+            if (!this.village3D.animationId) {
+                this.village3D.animate();
+            }
+        }
+        
         this.updateFriendCount();
         this.updateLearnedNotesDisplay();
         
         if (this.state.friends.length === chapterData.cats.length) {
-            this.elements.villageMessage.textContent = 
-                '全ての猫となかまになった！森の奥へ行ってみよう...';
+            this.elements.villageMessage.innerHTML = 
+                '全ての猫となかまになった！門番猫のところへ行ってみよう...<br><small>PC: WASD/矢印キーで移動<br>スマホ: 画面をタッチして移動</small>';
         } else {
             const remaining = chapterData.cats.length - this.state.friends.length;
             const escaped = this.state.escapedCats.length;
             
             if (escaped > 0) {
-                this.elements.villageMessage.textContent = 
-                    `あと ${remaining} 匹！🔄マークの猫に再挑戦できるよ！`;
+                this.elements.villageMessage.innerHTML = 
+                    `あと ${remaining} 匹！🔄マークの猫に再挑戦できるよ！<br><small>PC: WASD/矢印キーで移動<br>スマホ: 画面をタッチして移動</small>`;
             } else {
-                this.elements.villageMessage.textContent = 
-                    `あと ${remaining} 匹の猫がいるよ！`;
+                this.elements.villageMessage.innerHTML = 
+                    `あと ${remaining} 匹の猫がいるよ！<br><small>PC: WASD/矢印キーで移動<br>スマホ: 画面をタッチして移動</small>`;
             }
         }
     }
@@ -1688,6 +1883,1228 @@ class Game {
     
     delay(ms) {
         return new Promise(resolve => setTimeout(resolve, ms));
+    }
+}
+
+/**
+ * 3D村システム
+ */
+class Village3D {
+    constructor(canvas, gameInstance) {
+        this.canvas = canvas;
+        this.game = gameInstance;
+        this.scene = null;
+        this.camera = null;
+        this.renderer = null;
+        this.player = null;
+        this.cats = [];
+        this.keys = {};
+        this.touchControls = {
+            isActive: false,
+            startX: 0,
+            startY: 0,
+            lastX: 0,
+            lastY: 0,
+            moveTouch: null  // 移動用のタッチ
+        };
+        this.cameraOffset = new THREE.Vector3(-3, 8, 5);  // カメラのオフセット（後ろ、上、右）
+        // マウスコントロールは削除（不要）
+        this.playerSpeed = 0.1;
+        this.interactionDistance = 2.5;
+        this.animationId = null;
+        this.isDialogueActive = false;  // 会話中フラグ
+        this.lastInteractionTime = 0;  // 最後の会話開始時刻
+        this.interactionCooldown = 2000;  // 会話開始のクールダウン（ミリ秒）
+        this.followDistance = 2.5;  // 猫が追従する距離
+        this.followSpeed = 0.15;  // 猫の追従速度（速くする）
+        this.playerLastPosition = new THREE.Vector3(0, 0, 0);  // プレイヤーの前フレームの位置
+        this.lastFailedCatId = null;  // 最後に失敗した猫のID
+        this.lastFailedTime = 0;  // 最後に失敗した時間
+    }
+    
+    init(catsData, friends, escapedCats) {
+        if (!this.canvas) {
+            throw new Error('キャンバス要素が設定されていません');
+        }
+        
+        if (typeof THREE === 'undefined') {
+            throw new Error('Three.jsが読み込まれていません');
+        }
+        
+        try {
+            // 既存のシーンをクリーンアップ
+            if (this.scene) {
+                // 既存のオブジェクトを削除
+                while(this.scene.children.length > 0) {
+                    this.scene.remove(this.scene.children[0]);
+                }
+            }
+            
+            // 既存のレンダラーを破棄
+            if (this.renderer) {
+                try {
+                    this.renderer.dispose();
+                } catch (e) {
+                    console.warn('レンダラーの破棄中にエラー:', e);
+                }
+                this.renderer = null;
+            }
+            
+            // Three.jsシーンを初期化
+            this.scene = new THREE.Scene();
+            this.scene.background = new THREE.Color(0x87ceeb); // 空色
+            
+            // カメラ設定（少し俯瞰でプレイヤーを追いかける）
+            const aspect = window.innerWidth / window.innerHeight;
+            this.camera = new THREE.PerspectiveCamera(75, aspect, 0.1, 1000);
+            // カメラの初期位置（プレイヤーの後ろ、上、少し右）
+            this.cameraOffset = new THREE.Vector3(-3, 8, 5);
+            this.updateCamera();
+            
+            // レンダラー設定
+            this.renderer = new THREE.WebGLRenderer({ 
+                canvas: this.canvas,
+                antialias: true 
+            });
+            this.renderer.setSize(window.innerWidth, window.innerHeight);
+            this.renderer.shadowMap.enabled = true;
+            
+            // ライト設定
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+            this.scene.add(ambientLight);
+            
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            directionalLight.position.set(10, 20, 10);
+            directionalLight.castShadow = true;
+            directionalLight.shadow.mapSize.width = 2048;
+            directionalLight.shadow.mapSize.height = 2048;
+            this.scene.add(directionalLight);
+            
+            // 地面を作成
+            this.createGround();
+            
+            // 環境を作成（木、建物など）
+            this.createEnvironment();
+            
+            // プレイヤーを作成
+            this.createPlayer();
+            
+            // プレイヤーの初期位置を記録
+            if (this.player) {
+                this.playerLastPosition.copy(this.player.position);
+            }
+            
+            // 猫を配置
+            this.createCats(catsData, friends, escapedCats);
+            
+            // 門番猫を配置
+            this.createGateKeeperCat();
+            
+            // イベントリスナーを設定
+            this.setupControls();
+            
+            // リサイズハンドラーを保存
+            this.resizeHandler = () => this.onWindowResize();
+            window.addEventListener('resize', this.resizeHandler);
+            
+            // アニメーションループを開始
+            this.animate();
+        } catch (error) {
+            console.error('Village3D初期化エラー:', error);
+            throw error;
+        }
+    }
+    
+    createGround() {
+        // 地面
+        const groundGeometry = new THREE.PlaneGeometry(50, 50);
+        const groundMaterial = new THREE.MeshLambertMaterial({ color: 0x5fa55f });
+        const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+        ground.rotation.x = -Math.PI / 2;
+        ground.receiveShadow = true;
+        this.scene.add(ground);
+        
+        // 草のテクスチャ（簡易版）
+        const grassGeometry = new THREE.PlaneGeometry(50, 50, 20, 20);
+        const grassMaterial = new THREE.MeshLambertMaterial({ 
+            color: 0x4a8c4a,
+            wireframe: false
+        });
+        const grass = new THREE.Mesh(grassGeometry, grassMaterial);
+        grass.rotation.x = -Math.PI / 2;
+        grass.position.y = 0.01;
+        this.scene.add(grass);
+        
+        // 村の道を追加
+        this.createRoads();
+    }
+    
+    createRoads() {
+        // 石畳風の道（十字路）
+        const stoneMaterial = new THREE.MeshLambertMaterial({ color: 0x8b7355 });  // 茶色がかった石色
+        
+        // 縦の道（石畳風）
+        const roadVerticalGeometry = new THREE.PlaneGeometry(3, 50, 1, 20);
+        const roadVertical = new THREE.Mesh(roadVerticalGeometry, stoneMaterial);
+        roadVertical.rotation.x = -Math.PI / 2;
+        roadVertical.position.y = 0.02;
+        roadVertical.position.x = 0;  // 中央
+        this.scene.add(roadVertical);
+        
+        // 横の道（石畳風）
+        const roadHorizontalGeometry = new THREE.PlaneGeometry(50, 3, 20, 1);
+        const roadHorizontal = new THREE.Mesh(roadHorizontalGeometry, stoneMaterial);
+        roadHorizontal.rotation.x = -Math.PI / 2;
+        roadHorizontal.position.y = 0.02;
+        roadHorizontal.position.z = 0;  // 中央
+        this.scene.add(roadHorizontal);
+        
+        // 道に草をまばらに生やす
+        this.addGrassOnRoad();
+    }
+    
+    addGrassOnRoad() {
+        const grassMaterial = new THREE.MeshLambertMaterial({ color: 0x5fa55f });
+        const grassGeometry = new THREE.CylinderGeometry(0.05, 0.05, 0.2, 4);
+        
+        // 道の外側に草をまばらに配置（道の上には生やさない）
+        let grassCount = 0;
+        let attempts = 0;
+        while (grassCount < 20 && attempts < 200) {
+            attempts++;
+            const x = (Math.random() - 0.5) * 40;
+            const z = (Math.random() - 0.5) * 40;
+            
+            // 道の上でないことを確認（縦の道: |x| < 1.5、横の道: |z| < 1.5）
+            if (Math.abs(x) > 2 || Math.abs(z) > 2) {
+                if (Math.random() > 0.7) {  // 30%の確率で草を生やす
+                    const grass = new THREE.Mesh(grassGeometry, grassMaterial);
+                    grass.rotation.x = Math.random() * 0.3;
+                    grass.rotation.z = Math.random() * 0.3;
+                    grass.position.set(x, 0.1, z);
+                    this.scene.add(grass);
+                    grassCount++;
+                }
+            }
+        }
+    }
+    
+    createEnvironment() {
+        // 水辺を作成（建物の前に配置）
+        this.createWater();
+        
+        // 建物を配置
+        this.createBuildings();
+        
+        // 木を配置（建物よりもさらに外側に、道を避ける）
+        let treeCount = 0;
+        let attempts = 0;
+        while (treeCount < 12 && attempts < 200) {
+            attempts++;
+            const angle = Math.random() * Math.PI * 2;
+            const radius = 15 + Math.random() * 8;  // 15から23の範囲（建物は最大12程度なので外側）
+            const x = Math.cos(angle) * radius;
+            const z = Math.sin(angle) * radius;
+            
+            // 道の上でないことを確認（縦の道: |x| < 1.5、横の道: |z| < 1.5）
+            // 水辺の上でないことを確認
+            if (Math.abs(x) > 2 && Math.abs(z) > 2 && !this.isOnWater(x, z)) {
+                const tree = this.createTree();
+                tree.position.x = x;
+                tree.position.z = z;
+                this.scene.add(tree);
+                treeCount++;
+            }
+        }
+        
+        // 空に雲を追加（簡易版）
+        const cloudGeometry = new THREE.SphereGeometry(2, 8, 8);
+        const cloudMaterial = new THREE.MeshLambertMaterial({ color: 0xffffff, transparent: true, opacity: 0.8 });
+        for (let i = 0; i < 3; i++) {
+            const cloud = new THREE.Mesh(cloudGeometry, cloudMaterial);
+            cloud.position.set(
+                (Math.random() - 0.5) * 30,
+                8 + Math.random() * 2,
+                (Math.random() - 0.5) * 30
+            );
+            cloud.scale.set(1.5 + Math.random(), 1, 1.5 + Math.random());
+            this.scene.add(cloud);
+        }
+    }
+    
+    createWater() {
+        // 池を作成（村の一角に）
+        const waterGroup = new THREE.Group();
+        
+        // 池の底（地面より少し下に配置して重なりを避ける）
+        const waterGeometry = new THREE.PlaneGeometry(8, 6, 8, 6);
+        const waterMaterial = new THREE.MeshLambertMaterial({ 
+            color: 0x4a90c2,
+            transparent: true,
+            opacity: 0.8
+        });
+        const water = new THREE.Mesh(waterGeometry, waterMaterial);
+        water.rotation.x = -Math.PI / 2;
+        water.position.y = -0.05;  // 地面より少し下に
+        water.position.x = 15;  // 村の右側
+        water.position.z = 15;  // 村の下側
+        waterGroup.add(water);
+        
+        // 池の縁（石）
+        const edgeMaterial = new THREE.MeshLambertMaterial({ color: 0x8b7355 });
+        const edgeGeometry = new THREE.TorusGeometry(4.5, 0.3, 8, 16);
+        const edge = new THREE.Mesh(edgeGeometry, edgeMaterial);
+        edge.rotation.x = -Math.PI / 2;
+        edge.position.y = 0.05;
+        edge.position.x = 15;
+        edge.position.z = 15;
+        waterGroup.add(edge);
+        
+        // 池の縁（内側）
+        const innerEdgeGeometry = new THREE.TorusGeometry(3.5, 0.2, 8, 16);
+        const innerEdge = new THREE.Mesh(innerEdgeGeometry, edgeMaterial);
+        innerEdge.rotation.x = -Math.PI / 2;
+        innerEdge.position.y = 0.05;
+        innerEdge.position.x = 15;
+        innerEdge.position.z = 15;
+        waterGroup.add(innerEdge);
+        
+        // 小川を作成（村の端を流れる、道を避ける位置に）
+        const streamGeometry = new THREE.PlaneGeometry(25, 2.5, 25, 2);
+        const streamMaterial = new THREE.MeshLambertMaterial({ 
+            color: 0x4a90c2,
+            transparent: true,
+            opacity: 0.7
+        });
+        const stream = new THREE.Mesh(streamGeometry, streamMaterial);
+        stream.rotation.x = -Math.PI / 2;
+        stream.position.y = -0.05;  // 地面より少し下に
+        stream.position.x = -20;  // 村の左端（さらに外側）
+        stream.position.z = -5;    // 道を避ける（下側）
+        stream.rotation.z = Math.PI / 8;  // 少し傾ける
+        waterGroup.add(stream);
+        
+        // 小川の縁（草）
+        const grassMaterial = new THREE.MeshLambertMaterial({ color: 0x5fa55f });
+        const grassGeometry = new THREE.PlaneGeometry(20, 0.5, 20, 1);
+        const grassLeft = new THREE.Mesh(grassGeometry, grassMaterial);
+        grassLeft.rotation.x = -Math.PI / 2;
+        grassLeft.position.y = 0.02;
+        grassLeft.position.x = -18;
+        grassLeft.position.z = -0.8;
+        grassLeft.rotation.z = Math.PI / 6;
+        waterGroup.add(grassLeft);
+        
+        const grassRight = new THREE.Mesh(grassGeometry, grassMaterial);
+        grassRight.rotation.x = -Math.PI / 2;
+        grassRight.position.y = 0.02;
+        grassRight.position.x = -18;
+        grassRight.position.z = 0.8;
+        grassRight.rotation.z = Math.PI / 6;
+        waterGroup.add(grassRight);
+        
+        this.scene.add(waterGroup);
+        this.waterAreas = [
+            { x: 15, z: 15, radius: 4.5 },  // 池（少し大きめに）
+            { x: -20, z: -5, width: 25, height: 2.5, rotation: Math.PI / 8 }  // 小川（更新された位置）
+        ];
+    }
+    
+    isOnWater(x, z) {
+        // 水辺の上かどうかをチェック
+        if (!this.waterAreas) return false;
+        
+        for (const water of this.waterAreas) {
+            if (water.radius) {
+                // 円形の池
+                const dx = x - water.x;
+                const dz = z - water.z;
+                const distance = Math.sqrt(dx * dx + dz * dz);
+                if (distance < water.radius) return true;
+            } else {
+                // 長方形の小川
+                const dx = x - water.x;
+                const dz = z - water.z;
+                const cos = Math.cos(-water.rotation);
+                const sin = Math.sin(-water.rotation);
+                const rotatedX = dx * cos - dz * sin;
+                const rotatedZ = dx * sin + dz * cos;
+                if (Math.abs(rotatedX) < water.width / 2 && Math.abs(rotatedZ) < water.height / 2) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+    
+    createBuildings() {
+        // 中央広場を作成
+        this.createPlaza();
+        
+        // 建物の配置位置（周辺に配置、道を避ける）
+        // 各建物は道から離れた位置に配置し、道に向くようにする
+        // roadDirは家のドアが向く方向（広場への方向）
+        const buildingPositions = [
+            { x: -10, z: -10, width: 2.5, depth: 2.5, height: 2.5, doorDir: 'se' },  // 左上（南東方向の広場へ）
+            { x: 10, z: -10, width: 2.5, depth: 2.5, height: 2.5, doorDir: 'sw' },   // 右上（南西方向の広場へ）
+            { x: -10, z: 10, width: 2.5, depth: 2.5, height: 2.5, doorDir: 'ne' },   // 左下（北東方向の広場へ）
+            { x: 10, z: 10, width: 2.5, depth: 2.5, height: 2.5, doorDir: 'nw' },    // 右下（北西方向の広場へ）
+            { x: -12, z: -3, width: 2, depth: 3, height: 2.5, doorDir: 'e' }, // 左（東方向の広場へ）
+            { x: -12, z: 3, width: 2, depth: 3, height: 2.5, doorDir: 'e' }, // 左（東方向の広場へ）
+            { x: 12, z: -3, width: 2, depth: 3, height: 2.5, doorDir: 'w' },  // 右（西方向の広場へ）
+            { x: 12, z: 3, width: 2, depth: 3, height: 2.5, doorDir: 'w' },  // 右（西方向の道へ）
+            { x: -3, z: -12, width: 3, depth: 2, height: 2.5, doorDir: 's' }, // 上（南方向の広場へ）
+            { x: 3, z: -12, width: 3, depth: 2, height: 2.5, doorDir: 's' }, // 上（南方向の広場へ）
+            { x: -3, z: 12, width: 3, depth: 2, height: 2.5, doorDir: 'n' },   // 下（北方向の広場へ）
+            { x: 3, z: 12, width: 3, depth: 2, height: 2.5, doorDir: 'n' }   // 下（北方向の広場へ）
+        ];
+        
+        // 水辺の上に建物が配置されないようにフィルタリング
+        const validBuildingPositions = buildingPositions.filter(pos => {
+            return !this.isOnWater(pos.x, pos.z);
+        });
+        
+        // 家を配置
+        validBuildingPositions.forEach((pos, index) => {
+            const building = this.createBuilding(pos.width, pos.depth, pos.height, index, pos.doorDir, pos.x, pos.z);
+            building.position.set(pos.x, pos.height / 2, pos.z);
+            this.scene.add(building);
+        });
+        
+        // 道のネットワークを作成（家から広場、家から家へ）
+        this.createRoadNetwork(validBuildingPositions);
+        
+        // 村の出口に門を追加
+        this.createVillageGate();
+    }
+    
+    createRoadNetwork(buildingPositions) {
+        const pathMaterial = new THREE.MeshLambertMaterial({ color: 0x8b7355 });
+        const pathWidth = 1.5;
+        
+        // 各家から広場への道を作成（水辺を避ける）
+        buildingPositions.forEach(pos => {
+            const buildingX = pos.x;
+            const buildingZ = pos.z;
+            
+            // 広場の端（±3）までの道を作成
+            let pathStartX = buildingX;
+            let pathStartZ = buildingZ;
+            let pathEndX = 0;
+            let pathEndZ = 0;
+            let isHorizontal = false;
+            
+            // 家の位置に応じて広場への方向を決定
+            if (Math.abs(buildingX) > Math.abs(buildingZ)) {
+                // 横方向の道
+                isHorizontal = true;
+                pathEndX = buildingX > 0 ? 3 : -3;
+                pathEndZ = buildingZ;
+                pathStartX = buildingX > 0 ? 3 : -3;
+            } else {
+                // 縦方向の道
+                isHorizontal = false;
+                pathEndX = buildingX;
+                pathEndZ = buildingZ > 0 ? 3 : -3;
+                pathStartZ = buildingZ > 0 ? 3 : -3;
+            }
+            
+            // 家から広場の端までの距離
+            const pathLength = Math.sqrt(
+                Math.pow(buildingX - pathStartX, 2) + 
+                Math.pow(buildingZ - pathStartZ, 2)
+            );
+            
+            // 道が水辺の上でないことを確認
+            const pathMidX = (buildingX + pathStartX) / 2;
+            const pathMidZ = (buildingZ + pathStartZ) / 2;
+            if (pathLength > 1 && !this.isOnWater(pathMidX, pathMidZ)) {
+                const pathGeometry = new THREE.PlaneGeometry(
+                    isHorizontal ? pathLength : pathWidth,
+                    isHorizontal ? pathWidth : pathLength,
+                    1,
+                    Math.floor(pathLength)
+                );
+                const path = new THREE.Mesh(pathGeometry, pathMaterial);
+                path.rotation.x = -Math.PI / 2;
+                if (!isHorizontal) {
+                    path.rotation.z = Math.PI / 2;
+                }
+                path.position.y = 0.02;
+                path.position.x = pathMidX;
+                path.position.z = pathMidZ;
+                this.scene.add(path);
+            }
+        });
+    }
+    
+    createPlaza() {
+        // 中央広場を作成（道の交差点を広場にする）
+        const plazaMaterial = new THREE.MeshLambertMaterial({ color: 0x9d8468 });  // 少し明るい石色
+        const plazaGeometry = new THREE.PlaneGeometry(6, 6, 1, 1);
+        const plaza = new THREE.Mesh(plazaGeometry, plazaMaterial);
+        plaza.rotation.x = -Math.PI / 2;
+        plaza.position.y = 0.015;
+        plaza.position.x = 0;
+        plaza.position.z = 0;
+        this.scene.add(plaza);
+        
+        // 広場の周りに石を配置（装飾）
+        const stoneMaterial = new THREE.MeshLambertMaterial({ color: 0x8b7355 });
+        const stoneGeometry = new THREE.CylinderGeometry(0.2, 0.25, 0.3, 8);
+        
+        // 広場の四隅に石を配置
+        const stonePositions = [
+            { x: -2.5, z: -2.5 },
+            { x: 2.5, z: -2.5 },
+            { x: -2.5, z: 2.5 },
+            { x: 2.5, z: 2.5 }
+        ];
+        
+        stonePositions.forEach(pos => {
+            const stone = new THREE.Mesh(stoneGeometry, stoneMaterial);
+            stone.position.set(pos.x, 0.15, pos.z);
+            stone.castShadow = true;
+            this.scene.add(stone);
+        });
+    }
+    
+    
+    createBuilding(width, depth, height, index, roadDir, buildingX, buildingZ) {
+        const building = new THREE.Group();
+        
+        // 木でできた建物（木の色）
+        const woodColors = [
+            0x8b6f47,  // オーク
+            0x9d7a5a,  // ウォルナット
+            0xa0826d,  // ブラウン
+            0x8b7355,  // ダークブラウン
+            0x9d8468,  // オークダーク
+            0x7a5f47,  // チェスナット
+            0x8b6f47,  // オーク
+            0x9d7a5a   // ウォルナット
+        ];
+        
+        const wallMaterial = new THREE.MeshLambertMaterial({ 
+            color: woodColors[index % woodColors.length] 
+        });
+        
+        // 建物の本体（木の板風）
+        const bodyGeometry = new THREE.BoxGeometry(width, height, depth);
+        const body = new THREE.Mesh(bodyGeometry, wallMaterial);
+        body.castShadow = true;
+        body.receiveShadow = true;
+        building.add(body);
+        
+        // 木の板の縞模様（横方向の線）
+        const stripeMaterial = new THREE.MeshLambertMaterial({ color: 0x6b4f37 });
+        for (let i = 0; i < 3; i++) {
+            const stripeGeometry = new THREE.PlaneGeometry(width * 0.95, 0.05);
+            const stripe = new THREE.Mesh(stripeGeometry, stripeMaterial);
+            stripe.rotation.x = -Math.PI / 2;
+            stripe.position.set(0, -height / 2 + (i + 1) * (height / 4), depth / 2 + 0.01);
+            building.add(stripe);
+        }
+        
+        // ファンタジーな三角屋根（鮮やかな色）
+        const roofColors = [
+            0xff4444,  // 赤
+            0x4444ff,  // 青
+            0x44ff44,  // 緑
+            0xff44ff,  // マゼンタ（紫）
+            0xffff44,  // 黄色
+            0xff8844,  // オレンジ
+            0x44ffff,  // シアン
+            0xff88ff,  // ピンク
+            0x8844ff,  // 紫
+            0xffaa44,  // オレンジイエロー
+            0x44ff88,  // ミントグリーン
+            0xff4488   // ローズ
+        ];
+        
+        const roofMaterial = new THREE.MeshLambertMaterial({ 
+            color: roofColors[index % roofColors.length] 
+        });
+        
+        // 三角屋根（三角錐の形状）
+        const roofHeight = height * 0.4;
+        const roofGeometry = new THREE.ConeGeometry(
+            Math.max(width, depth) * 0.75,  // 底面の半径
+            roofHeight,  // 高さ
+            4  // セグメント数（四角錐）
+        );
+        const roof = new THREE.Mesh(roofGeometry, roofMaterial);
+        roof.position.y = height / 2 + roofHeight / 2;
+        roof.rotation.y = Math.PI / 4;  // 45度回転して角を合わせる
+        roof.castShadow = true;
+        building.add(roof);
+        
+        // 窓を追加（かわいい丸窓風）
+        const windowMaterial = new THREE.MeshLambertMaterial({ 
+            color: 0x87ceeb,
+            emissive: 0x333333,
+            emissiveIntensity: 0.2
+        });
+        
+        // 前面に丸窓
+        const windowGeometry = new THREE.CircleGeometry(width * 0.2, 16);
+        const window1 = new THREE.Mesh(windowGeometry, windowMaterial);
+        window1.rotation.x = -Math.PI / 2;
+        window1.position.set(0, height * 0.2, depth / 2 + 0.01);
+        building.add(window1);
+        
+        // ドア（かわいい小さなドア）
+        const doorMaterial = new THREE.MeshLambertMaterial({ color: 0x654321 });
+        const doorGeometry = new THREE.PlaneGeometry(width * 0.35, height * 0.6);
+        const door = new THREE.Mesh(doorGeometry, doorMaterial);
+        door.position.set(0, -height * 0.2, depth / 2 + 0.01);
+        building.add(door);
+        
+        // ドアノブ
+        const knobGeometry = new THREE.SphereGeometry(0.05, 8, 8);
+        const knobMaterial = new THREE.MeshLambertMaterial({ color: 0xffd700 });
+        const knob = new THREE.Mesh(knobGeometry, knobMaterial);
+        knob.position.set(width * 0.15, -height * 0.2, depth / 2 + 0.02);
+        building.add(knob);
+        
+        // 家の向きを広場（中央）に向ける（ドアが広場に向くように）
+        // 家の位置から広場(0,0)への方向を計算
+        if (buildingX !== undefined && buildingZ !== undefined) {
+            // 広場への方向ベクトル
+            const dx = 0 - buildingX;
+            const dz = 0 - buildingZ;
+            
+            // 角度を計算（atan2で-πからπの範囲）
+            // Three.jsでは、デフォルトで前面は-Z方向なので、+π/2を加算
+            const angle = Math.atan2(dx, dz);
+            building.rotation.y = angle;
+        } else if (roadDir) {
+            // フォールバック：roadDirから計算
+            let rotationY = 0;
+            if (roadDir === 'e' || roadDir === 'ne' || roadDir === 'se') {
+                rotationY = -Math.PI / 2;
+            } else if (roadDir === 'w' || roadDir === 'nw' || roadDir === 'sw') {
+                rotationY = Math.PI / 2;
+            } else if (roadDir === 's' || roadDir === 'se' || roadDir === 'sw') {
+                rotationY = 0;
+            } else if (roadDir === 'n' || roadDir === 'ne' || roadDir === 'nw') {
+                rotationY = Math.PI;
+            }
+            building.rotation.y = rotationY;
+        }
+        
+        return building;
+    }
+    
+    createVillageGate() {
+        // 村の出口（森への入り口）に門を配置
+        const gateGroup = new THREE.Group();
+        
+        // 門の柱（左右）
+        const pillarMaterial = new THREE.MeshLambertMaterial({ color: 0x8b6f47 });
+        const pillarGeometry = new THREE.CylinderGeometry(0.3, 0.4, 3, 8);
+        
+        const leftPillar = new THREE.Mesh(pillarGeometry, pillarMaterial);
+        leftPillar.position.set(-2, 1.5, -18);
+        leftPillar.castShadow = true;
+        gateGroup.add(leftPillar);
+        
+        const rightPillar = new THREE.Mesh(pillarGeometry, pillarMaterial);
+        rightPillar.position.set(2, 1.5, -18);
+        rightPillar.castShadow = true;
+        gateGroup.add(rightPillar);
+        
+        // 門の横木
+        const beamGeometry = new THREE.BoxGeometry(4.5, 0.3, 0.3);
+        const beam = new THREE.Mesh(beamGeometry, pillarMaterial);
+        beam.position.set(0, 2.8, -18);
+        beam.castShadow = true;
+        gateGroup.add(beam);
+        
+        // 門の看板
+        const signGeometry = new THREE.PlaneGeometry(2, 0.8);
+        const signMaterial = new THREE.MeshLambertMaterial({ color: 0xd4a574 });
+        const sign = new THREE.Mesh(signGeometry, signMaterial);
+        sign.rotation.x = -Math.PI / 2;
+        sign.position.set(0, 2.2, -18);
+        gateGroup.add(sign);
+        
+        this.scene.add(gateGroup);
+        this.villageGate = gateGroup;
+        
+        // 門番猫の位置を記録（後で使用）
+        this.gatePosition = new THREE.Vector3(0, 0.5, -18);
+    }
+    
+    createGateKeeperCat() {
+        // 門番猫を作成
+        const gateKeeperGroup = new THREE.Group();
+        
+        // 猫の体
+        const bodyGeometry = new THREE.SphereGeometry(0.6, 16, 16);
+        const bodyMaterial = new THREE.MeshLambertMaterial({ 
+            color: 0xffd700  // 金色（特別な猫）
+        });
+        const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+        body.castShadow = true;
+        gateKeeperGroup.add(body);
+        
+        // 門番猫の位置
+        gateKeeperGroup.position.set(0, 0.6, -18);
+        
+        // エモジラベル
+        this.createCatLabel(gateKeeperGroup, '🛡️', '門番猫');
+        
+        this.scene.add(gateKeeperGroup);
+        this.gateKeeperCat = gateKeeperGroup;
+        this.gateKeeperPosition = new THREE.Vector3(0, 0.6, -18);
+    }
+    
+    createTree() {
+        const tree = new THREE.Group();
+        
+        // 幹
+        const trunkGeometry = new THREE.CylinderGeometry(0.3, 0.4, 3, 8);
+        const trunkMaterial = new THREE.MeshLambertMaterial({ color: 0x5a3d2d });
+        const trunk = new THREE.Mesh(trunkGeometry, trunkMaterial);
+        trunk.position.y = 1.5;
+        trunk.castShadow = true;
+        tree.add(trunk);
+        
+        // 葉
+        const leavesGeometry = new THREE.ConeGeometry(2, 3, 8);
+        const leavesMaterial = new THREE.MeshLambertMaterial({ color: 0x2d5a2d });
+        const leaves = new THREE.Mesh(leavesGeometry, leavesMaterial);
+        leaves.position.y = 3.5;
+        leaves.castShadow = true;
+        tree.add(leaves);
+        
+        return tree;
+    }
+    
+    createPlayer() {
+        // プレイヤーをシンプルなキューブで表現
+        const geometry = new THREE.BoxGeometry(0.8, 1.6, 0.8);
+        const material = new THREE.MeshLambertMaterial({ color: 0x4a90c2 });
+        this.player = new THREE.Mesh(geometry, material);
+        this.player.position.set(0, 0.8, 0);
+        this.player.castShadow = true;
+        this.scene.add(this.player);
+        
+        // プレイヤーの上にマーカーを追加
+        const markerGeometry = new THREE.ConeGeometry(0.3, 0.5, 4);
+        const markerMaterial = new THREE.MeshLambertMaterial({ color: 0xffd700 });
+        const marker = new THREE.Mesh(markerGeometry, markerMaterial);
+        marker.position.y = 1.2;
+        this.player.add(marker);
+    }
+    
+    createCats(catsData, friends, escapedCats) {
+        // 既存の猫を削除
+        this.cats.forEach(catObj => {
+            if (catObj.mesh && this.scene) {
+                this.scene.remove(catObj.mesh);
+            }
+        });
+        this.cats = [];
+        
+        catsData.forEach((cat, index) => {
+            const isFriend = friends.includes(cat.id);
+            const hasEscaped = escapedCats.includes(cat.id);
+            
+            // 猫の3Dモデル（シンプルな球体 + テキスト）
+            const catGroup = new THREE.Group();
+            
+            // 猫の体
+            const bodyGeometry = new THREE.SphereGeometry(0.5, 16, 16);
+            const bodyMaterial = new THREE.MeshLambertMaterial({ 
+                color: isFriend ? 0xffd700 : (hasEscaped ? 0x888888 : 0xffa500)
+            });
+            const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+            body.castShadow = true;
+            catGroup.add(body);
+            
+            // 猫の位置を3D座標に変換（元の2D位置を3Dにマッピング）
+            // プレイヤーの初期位置(0,0)から離すように調整
+            const x = (cat.position.x / 100) * 20 - 10; // -10 から 10 の範囲
+            const z = (cat.position.y / 100) * 20 - 10;
+            
+            // プレイヤーの初期位置(0, 0)から最低3ユニット離す
+            const playerPos = new THREE.Vector3(0, 0, 0);
+            let catPos = new THREE.Vector3(x, 0, z);
+            const distance = playerPos.distanceTo(catPos);
+            if (distance < 3) {
+                // プレイヤーから離す方向に調整
+                const direction = catPos.clone().sub(playerPos).normalize();
+                catPos = playerPos.clone().add(direction.multiplyScalar(3));
+            }
+            
+            // 猫の位置を設定
+            catGroup.position.set(catPos.x, 0.5, catPos.z);
+            
+            // 猫のデータを保存（調整後の位置を使用）
+            const catObj = {
+                mesh: catGroup,
+                data: cat,
+                isFriend: isFriend,
+                hasEscaped: hasEscaped,
+                position: new THREE.Vector3(catPos.x, 0.5, catPos.z)
+            };
+            
+            this.cats.push(catObj);
+            this.scene.add(catGroup);
+            
+            // エモジを表示するためのスプライト（簡易版：テキストを使用）
+            this.createCatLabel(catGroup, cat.emoji, cat.name);
+        });
+    }
+    
+    createCatLabel(catGroup, emoji, name) {
+        // キャンバスでテキストを描画
+        const canvas = document.createElement('canvas');
+        const context = canvas.getContext('2d');
+        canvas.width = 256;
+        canvas.height = 128;
+        
+        context.fillStyle = 'rgba(255, 255, 255, 0.8)';
+        context.fillRect(0, 0, canvas.width, canvas.height);
+        context.font = '48px Arial';
+        context.textAlign = 'center';
+        context.textBaseline = 'middle';
+        context.fillStyle = '#000000';
+        context.fillText(emoji, canvas.width / 2, canvas.height / 2);
+        
+        const texture = new THREE.CanvasTexture(canvas);
+        const spriteMaterial = new THREE.SpriteMaterial({ map: texture });
+        const sprite = new THREE.Sprite(spriteMaterial);
+        sprite.scale.set(2, 1, 1);
+        sprite.position.y = 1.5;
+        catGroup.add(sprite);
+    }
+    
+    setupControls() {
+        // キーボード入力
+        document.addEventListener('keydown', (e) => {
+            this.keys[e.key.toLowerCase()] = true;
+            this.keys[e.code] = true;
+        });
+        
+        document.addEventListener('keyup', (e) => {
+            this.keys[e.key.toLowerCase()] = false;
+            this.keys[e.code] = false;
+        });
+        
+        // タッチ操作（移動のみ）
+        this.canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if (e.touches.length === 1) {
+                // 単一タッチ：移動用
+                this.touchControls.moveTouch = {
+                    id: e.touches[0].identifier,
+                    startX: e.touches[0].clientX,
+                    startY: e.touches[0].clientY,
+                    lastX: e.touches[0].clientX,
+                    lastY: e.touches[0].clientY
+                };
+            }
+        });
+        
+        this.canvas.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            
+            // 移動用タッチを処理
+            if (this.touchControls.moveTouch) {
+                const touch = Array.from(e.touches).find(t => t.identifier === this.touchControls.moveTouch.id);
+                if (touch) {
+                    const deltaX = touch.clientX - this.touchControls.moveTouch.lastX;
+                    const deltaY = touch.clientY - this.touchControls.moveTouch.lastY;
+                    
+                    // 移動方向を計算（画面の下半分をタッチした場合のみ移動）
+                    const canvasRect = this.canvas.getBoundingClientRect();
+                    const touchY = touch.clientY - canvasRect.top;
+                    const canvasHeight = canvasRect.height;
+                    
+                    // タッチの方向に応じて移動（画面全体で移動可能）
+                    const moveVector = new THREE.Vector3();
+                    
+                    // カメラの方向ではなく、固定方向で移動（上=前、下=後、左=左、右=右）
+                    const forward = -deltaY * 0.01;
+                    const right = deltaX * 0.01;
+                    
+                    // ワールド座標系での前後左右
+                    moveVector.z = forward;  // 前後（Z軸）
+                    moveVector.x = right;    // 左右（X軸）
+                    
+                    if (this.player) {
+                        this.player.position.add(moveVector);
+                        const boundary = 20;
+                        this.player.position.x = Math.max(-boundary, Math.min(boundary, this.player.position.x));
+                        this.player.position.z = Math.max(-boundary, Math.min(boundary, this.player.position.z));
+                        
+                        // カメラを更新
+                        this.updateCamera();
+                    }
+                    
+                    this.touchControls.moveTouch.lastX = touch.clientX;
+                    this.touchControls.moveTouch.lastY = touch.clientY;
+                }
+            }
+        });
+        
+        this.canvas.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            // 終了したタッチを削除
+            const endedIds = Array.from(e.changedTouches).map(t => t.identifier);
+            if (this.touchControls.moveTouch && endedIds.includes(this.touchControls.moveTouch.id)) {
+                this.touchControls.moveTouch = null;
+            }
+        });
+    }
+    
+    updateCamera() {
+        if (!this.player || !this.camera) return;
+        
+        // カメラをプレイヤーの位置からオフセット分だけ離した位置に配置
+        const cameraPosition = this.player.position.clone().add(this.cameraOffset);
+        this.camera.position.copy(cameraPosition);
+        
+        // カメラは常にプレイヤーを見る
+        this.camera.lookAt(this.player.position);
+    }
+    
+    updateFollowingCats() {
+        if (!this.player) return;
+        
+        // 仲間になった猫を取得（順番を保持）
+        const followingCats = this.cats.filter(catObj => catObj.isFriend);
+        
+        if (followingCats.length === 0) return;
+        
+        // プレイヤーの位置を基準に、後ろに列を作る
+        const playerPos = this.player.position.clone();
+        playerPos.y = 0.5;  // 地面の高さ
+        
+        // プレイヤーの移動方向を計算（前フレームとの差分から）
+        const lastPos = this.playerLastPosition.clone();
+        lastPos.y = 0.5;
+        const moveDirection = playerPos.clone().sub(lastPos);
+        let followDirection = new THREE.Vector3(0, 0, -1);  // デフォルトは後ろ方向
+        
+        if (moveDirection.length() > 0.01) {
+            // 移動している場合は、移動方向の逆方向（後ろ）を計算
+            followDirection = moveDirection.clone().normalize().multiplyScalar(-1);
+        }
+        
+        // 各猫が前の位置を追従
+        followingCats.forEach((catObj, index) => {
+            if (!catObj.mesh) return;
+            
+            let targetPosition;
+            
+            if (index === 0) {
+                // 最初の猫はプレイヤーの後ろ
+                targetPosition = playerPos.clone().add(followDirection.multiplyScalar(this.followDistance));
+            } else {
+                // 2匹目以降は前の猫の後ろ
+                const prevCat = followingCats[index - 1];
+                if (prevCat && prevCat.mesh) {
+                    const prevPos = prevCat.mesh.position.clone();
+                    prevPos.y = 0.5;
+                    
+                    // 前の猫からプレイヤーへの方向を計算
+                    const direction = playerPos.clone().sub(prevPos).normalize();
+                    if (direction.length() < 0.1) {
+                        // 方向が不明確な場合は後ろ方向
+                        direction.set(0, 0, -1);
+                    }
+                    
+                    targetPosition = prevPos.clone().add(direction.multiplyScalar(-this.followDistance));
+                } else {
+                    // 前の猫がいない場合はプレイヤーの後ろ
+                    targetPosition = playerPos.clone().add(new THREE.Vector3(0, 0, -this.followDistance * (index + 1)));
+                }
+            }
+            
+            // 現在の位置から目標位置へスムーズに移動
+            const currentPos = catObj.mesh.position.clone();
+            currentPos.y = 0.5;  // 高さを固定
+            
+            const direction = targetPosition.clone().sub(currentPos);
+            const distance = direction.length();
+            
+            // 常に目標位置に向かって移動（距離が0.05より大きい場合）
+            if (distance > 0.05) {
+                // 目標位置に近づく
+                direction.normalize();
+                // 距離に応じて速度を調整（遠いほど速く）
+                const speedMultiplier = Math.min(3.0, distance / this.followDistance);
+                const moveAmount = Math.min(distance, this.followSpeed * (1 + speedMultiplier * 0.5));
+                const newPos = currentPos.clone().add(direction.multiplyScalar(moveAmount));
+                
+                catObj.mesh.position.x = newPos.x;
+                catObj.mesh.position.z = newPos.z;
+                
+                // 猫の位置データも更新
+                catObj.position.copy(newPos);
+                
+                // 猫が移動方向を向く
+                if (direction.length() > 0.01) {
+                    const lookAtPos = newPos.clone().add(direction);
+                    catObj.mesh.lookAt(lookAtPos);
+                }
+            } else {
+                // 目標位置に到達したら位置を更新
+                catObj.mesh.position.x = targetPosition.x;
+                catObj.mesh.position.z = targetPosition.z;
+                catObj.position.copy(targetPosition);
+            }
+        });
+    }
+    
+    updatePlayerMovement() {
+        if (!this.player) return;
+        
+        const moveVector = new THREE.Vector3();
+        
+        // キーボード入力に応じて移動（固定方向：WASD/矢印キー）
+        if (this.keys['w'] || this.keys['ArrowUp']) {
+            moveVector.z -= this.playerSpeed;  // 前（Z軸負方向）
+        }
+        if (this.keys['s'] || this.keys['ArrowDown']) {
+            moveVector.z += this.playerSpeed;  // 後（Z軸正方向）
+        }
+        if (this.keys['a'] || this.keys['ArrowLeft']) {
+            moveVector.x -= this.playerSpeed;  // 左（X軸負方向）
+        }
+        if (this.keys['d'] || this.keys['ArrowRight']) {
+            moveVector.x += this.playerSpeed;  // 右（X軸正方向）
+        }
+        
+        // 移動を適用
+        if (moveVector.length() > 0) {
+            // プレイヤーの位置を更新前に記録（猫の追従計算用）
+            this.playerLastPosition.copy(this.player.position);
+            this.player.position.add(moveVector);
+        }
+        
+        // 境界チェック
+        const boundary = 20;
+        this.player.position.x = Math.max(-boundary, Math.min(boundary, this.player.position.x));
+        this.player.position.z = Math.max(-boundary, Math.min(boundary, this.player.position.z));
+        
+        // カメラを更新（プレイヤーが移動したら追従）
+        this.updateCamera();
+    }
+    
+    checkCatInteraction() {
+        if (!this.player) return;
+        
+        // 会話中またはクールダウン中はスキップ
+        if (this.isDialogueActive) return;
+        const now = Date.now();
+        if (now - this.lastInteractionTime < this.interactionCooldown) return;
+        
+        // 現在の画面が村画面でない場合はスキップ
+        if (this.game.state.currentScreen !== 'village') {
+            this.isDialogueActive = false;
+            return;
+        }
+        
+        // 門番猫との距離をチェック
+        if (this.gateKeeperPosition) {
+            const gateDistance = this.player.position.distanceTo(this.gateKeeperPosition);
+            if (gateDistance < this.interactionDistance) {
+                // 門番猫が失敗した場合は、一定時間は会話を開始しない
+                if (this.lastFailedCatId === 'gate_keeper') {
+                    const timeSinceFailure = now - this.lastFailedTime;
+                    if (timeSinceFailure < 5000) {  // 失敗後5秒間は会話を開始しない
+                        return;
+                    }
+                }
+                this.checkGateKeeperInteraction();
+                return;  // 門番猫との会話を優先
+            }
+        }
+        
+        this.cats.forEach(catObj => {
+            if (catObj.isFriend) return; // 既に仲間になった猫はスキップ
+            
+            // 失敗した猫に対しては、一定時間は会話を開始しない
+            if (this.lastFailedCatId === catObj.data.id) {
+                const timeSinceFailure = now - this.lastFailedTime;
+                if (timeSinceFailure < 5000) {  // 失敗後5秒間は会話を開始しない
+                    return;
+                }
+            }
+            
+            const distance = this.player.position.distanceTo(catObj.position);
+            
+            if (distance < this.interactionDistance) {
+                // 会話フラグを設定して重複を防ぐ
+                this.isDialogueActive = true;
+                this.lastInteractionTime = now;
+                
+                // アニメーションを一時停止
+                if (this.animationId) {
+                    cancelAnimationFrame(this.animationId);
+                    this.animationId = null;
+                }
+                
+                // 猫に近づいたら会話を開始
+                const hasEscaped = catObj.hasEscaped;
+                this.game.startDialogue(catObj.data, hasEscaped);
+            }
+        });
+    }
+    
+    checkGateKeeperInteraction() {
+        const chapterData = CHAPTER_CHARACTERS[this.game.state.currentChapter];
+        const totalCats = chapterData ? chapterData.cats.length : 0;
+        const friendCount = this.game.state.friends.length;
+        
+        // 門番猫の会話を開始
+        this.isDialogueActive = true;
+        this.lastInteractionTime = Date.now();
+        
+        // アニメーションを一時停止
+        if (this.animationId) {
+            cancelAnimationFrame(this.animationId);
+            this.animationId = null;
+        }
+        
+        // 門番猫のキャラクターデータを作成
+        const gateKeeper = {
+            id: 'gate_keeper',
+            name: '門番猫',
+            type: 'cat',
+            emoji: '🛡️',
+            personality: '門番',
+            description: '村の出口を守る門番猫',
+            position: { x: 50, y: 50 },
+            phrases: [['do', 're', 'mi']],
+            currentPhrase: 0,
+            tempo: 0.5,
+            difficulty: 1,
+            dialogue: {
+                greeting: friendCount >= totalCats 
+                    ? 'ニャー！\n（全ての猫となかまになったね！\n森の奥へ行くことを許可するよ！）'
+                    : `ニャー...\n（あと ${totalCats - friendCount} 匹の猫となかまにならないと、\n森の奥へは行けないよ...）`,
+                success: 'ニャー！\n（森の奥へ行くことを許可するよ！）',
+                failure: 'ニャー...\n（まだ通すわけにはいかない...）'
+            }
+        };
+        
+        // 会話を開始（全ての猫となかまになっているかどうかでメッセージが変わる）
+        this.game.startDialogue(gateKeeper, false);
+    }
+    
+    animate() {
+        // 会話中または村画面でない場合はアニメーションを停止
+        if (this.isDialogueActive || this.game.state.currentScreen !== 'village') {
+            this.animationId = null;
+            return;
+        }
+        
+        this.animationId = requestAnimationFrame(() => this.animate());
+        
+        this.updatePlayerMovement();
+        this.checkCatInteraction();
+        
+        // カメラを常に更新（スムーズな追従のため）
+        this.updateCamera();
+        
+        // 仲間になった猫をプレイヤーの後ろにつかせる
+        this.updateFollowingCats();
+        
+        // プレイヤーの位置を記録（次のフレームで使用）
+        if (this.player) {
+            this.playerLastPosition.copy(this.player.position);
+        }
+        
+        // 門番猫のアニメーション
+        if (this.gateKeeperCat) {
+            this.gateKeeperCat.position.y = 0.6 + Math.sin(Date.now() * 0.001) * 0.15;
+            this.gateKeeperCat.rotation.y += 0.005;
+        }
+        
+        // 猫のアニメーション（上下に浮遊）
+        this.cats.forEach(catObj => {
+            if (catObj.mesh) {
+                // 仲間になった猫は追従中なので浮遊アニメーションは控えめに
+                if (catObj.isFriend) {
+                    catObj.mesh.position.y = 0.5 + Math.sin(Date.now() * 0.001 + catObj.data.id.length) * 0.1;
+                } else {
+                    catObj.mesh.position.y = 0.5 + Math.sin(Date.now() * 0.001 + catObj.data.id.length) * 0.2;
+                }
+                catObj.mesh.rotation.y += 0.01;
+            }
+        });
+        
+        if (this.renderer && this.scene && this.camera) {
+            this.renderer.render(this.scene, this.camera);
+        }
+    }
+    
+    onWindowResize() {
+        this.camera.aspect = window.innerWidth / window.innerHeight;
+        this.camera.updateProjectionMatrix();
+        this.renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+    
+    destroy() {
+        try {
+            if (this.animationId) {
+                cancelAnimationFrame(this.animationId);
+                this.animationId = null;
+            }
+            
+            // イベントリスナーを削除
+            if (this.resizeHandler) {
+                window.removeEventListener('resize', this.resizeHandler);
+                this.resizeHandler = null;
+            }
+            
+            // シーンのオブジェクトを削除
+            if (this.scene) {
+                const disposeObject = (obj) => {
+                    if (obj.geometry) obj.geometry.dispose();
+                    if (obj.material) {
+                        if (Array.isArray(obj.material)) {
+                            obj.material.forEach(mat => {
+                                if (mat.map) mat.map.dispose();
+                                mat.dispose();
+                            });
+                        } else {
+                            if (obj.material.map) obj.material.map.dispose();
+                            obj.material.dispose();
+                        }
+                    }
+                };
+                
+                while(this.scene.children.length > 0) {
+                    const child = this.scene.children[0];
+                    disposeObject(child);
+                    // 子要素も再帰的に処理
+                    if (child.children) {
+                        child.children.forEach(disposeObject);
+                    }
+                    this.scene.remove(child);
+                }
+            }
+            
+            // レンダラーを破棄
+            if (this.renderer) {
+                this.renderer.dispose();
+                this.renderer = null;
+            }
+            
+            this.scene = null;
+            this.camera = null;
+            this.player = null;
+            this.cats = [];
+        } catch (error) {
+            console.error('Village3D破棄エラー:', error);
+        }
     }
 }
 
