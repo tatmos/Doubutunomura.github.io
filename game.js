@@ -1511,7 +1511,7 @@ class Game {
         }
     }
     
-    continueFromResult() {
+    async continueFromResult() {
         const chapterData = CHAPTER_CHARACTERS[this.state.currentChapter];
         
         // 門番猫との会話で全ての猫となかまになっている場合は森へ
@@ -1561,7 +1561,7 @@ class Game {
                 this.village3D.interactionCooldown = 5000;
             }
             
-            this.village3D.createCats(chapterData.cats, this.state.friends, this.state.escapedCats);
+            await this.village3D.createCats(chapterData.cats, this.state.friends, this.state.escapedCats);
             
             // 失敗した猫を少し離れた場所に移動（門番猫の場合は位置変更不要）
             if (wasFailure && lastCharacter && lastCharacter.id !== 'gate_keeper' && this.village3D.cats) {
@@ -2009,7 +2009,7 @@ class Village3D {
             }
             
             // 猫を配置
-            this.createCats(catsData, friends, escapedCats);
+            await this.createCats(catsData, friends, escapedCats);
             
             // 門番猫を配置
             this.createGateKeeperCat();
@@ -2629,7 +2629,7 @@ class Village3D {
         this.player.add(marker);
     }
     
-    createCats(catsData, friends, escapedCats) {
+    async createCats(catsData, friends, escapedCats) {
         // 既存の猫を削除
         this.cats.forEach(catObj => {
             if (catObj.mesh && this.scene) {
@@ -2638,45 +2638,9 @@ class Village3D {
         });
         this.cats = [];
         
-        catsData.forEach((cat, index) => {
+        for (const [index, cat] of catsData.entries()) {
             const isFriend = friends.includes(cat.id);
             const hasEscaped = escapedCats.includes(cat.id);
-            
-            // 猫の3Dモデル（シンプルな球体 + テキスト）
-            // AI生成モデルを使用する場合は、以下のように読み込めます：
-            // 
-            // let catGroup;
-            // try {
-            //     catGroup = await this.loadGLTFModel(`models/cat_${cat.id}.glb`, {
-            //         scale: 0.5,  // 猫のサイズに合わせて調整
-            //         position: { x: catPos.x, y: 0.5, z: catPos.z },
-            //         castShadow: true,
-            //         receiveShadow: true,
-            //         playAnimation: true  // アニメーションがある場合（歩く、座るなど）
-            //     });
-            // } catch (error) {
-            //     console.error(`猫モデル(${cat.id})の読み込みに失敗:`, error);
-            //     // フォールバック：シンプルな球体を使用
-            //     catGroup = new THREE.Group();
-            //     const bodyGeometry = new THREE.SphereGeometry(0.5, 16, 16);
-            //     const bodyMaterial = new THREE.MeshLambertMaterial({ 
-            //         color: isFriend ? 0xffd700 : (hasEscaped ? 0x888888 : 0xffa500)
-            //     });
-            //     const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
-            //     body.castShadow = true;
-            //     catGroup.add(body);
-            // }
-            
-            const catGroup = new THREE.Group();
-            
-            // 猫の体
-            const bodyGeometry = new THREE.SphereGeometry(0.5, 16, 16);
-            const bodyMaterial = new THREE.MeshLambertMaterial({ 
-                color: isFriend ? 0xffd700 : (hasEscaped ? 0x888888 : 0xffa500)
-            });
-            const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
-            body.castShadow = true;
-            catGroup.add(body);
             
             // 猫の位置を3D座標に変換（元の2D位置を3Dにマッピング）
             // プレイヤーの初期位置(0,0)から離すように調整
@@ -2692,6 +2656,42 @@ class Village3D {
                 const direction = catPos.clone().sub(playerPos).normalize();
                 catPos = playerPos.clone().add(direction.multiplyScalar(3));
             }
+            
+            // 猫の3Dモデル（シンプルな球体 + テキスト）
+            // AI生成モデルを使用する場合は、以下のように読み込めます：
+            
+            let catGroup;
+            try {
+                catGroup = await this.loadGLTFModel(`models/muraneko_${ Math.floor(Math.random() * 3) + 1}.glb`, {
+                    scale: 1.0,  // 猫のサイズに合わせて調整
+                    position: { x: catPos.x, y: 0.5, z: catPos.z },
+                    castShadow: true,
+                    receiveShadow: true,
+                    playAnimation: true  // アニメーションがある場合（歩く、座るなど）
+                });
+            } catch (error) {
+                console.error(`猫モデル(${cat.id})の読み込みに失敗:`, error);
+                // フォールバック：シンプルな球体を使用
+                catGroup = new THREE.Group();
+                const bodyGeometry = new THREE.SphereGeometry(0.5, 16, 16);
+                const bodyMaterial = new THREE.MeshLambertMaterial({ 
+                    color: isFriend ? 0xffd700 : (hasEscaped ? 0x888888 : 0xffa500)
+                });
+                const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+                body.castShadow = true;
+                catGroup.add(body);
+            }
+            
+            // const catGroup = new THREE.Group();
+            
+            // 猫の体
+            // const bodyGeometry = new THREE.SphereGeometry(0.5, 16, 16);
+            // const bodyMaterial = new THREE.MeshLambertMaterial({ 
+            //     color: isFriend ? 0xffd700 : (hasEscaped ? 0x888888 : 0xffa500)
+            // });
+            // const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+            // body.castShadow = true;
+            // catGroup.add(body);
             
             // 猫の位置を設定
             catGroup.position.set(catPos.x, 0.5, catPos.z);
@@ -2710,7 +2710,7 @@ class Village3D {
             
             // エモジを表示するためのスプライト（簡易版：テキストを使用）
             this.createCatLabel(catGroup, cat.emoji, cat.name);
-        });
+        }
     }
     
     createCatLabel(catGroup, emoji, name) {
@@ -2957,7 +2957,7 @@ class Village3D {
             // 移動方向にプレイヤーを向ける
             // Three.jsでは、rotation.yが水平面での向き（0が-Z方向、Math.PI/2が-X方向）
             // atan2(x, z)で移動方向の角度を計算
-            const angle = Math.atan2(moveVector.x, moveVector.z);
+            const angle = Math.atan2(moveVector.x, moveVector.z) - Math.PI/2;
             this.player.rotation.y = angle;
         }
         
@@ -2984,39 +2984,19 @@ class Village3D {
             return;
         }
         
-        // プレイヤーの前方方向を計算（rotation.yから）
-        // Three.jsでは、rotation.yが0の時は-Z方向（前）を向いている
-        const playerRotation = this.player.rotation.y;
-        const forwardDirection = new THREE.Vector3(
-            Math.sin(playerRotation),
-            0,
-            Math.cos(playerRotation)
-        );
-        
-        // 門番猫との距離と方向をチェック
+        // 門番猫との距離をチェック
         if (this.gateKeeperPosition) {
             const gateDistance = this.player.position.distanceTo(this.gateKeeperPosition);
             if (gateDistance < this.interactionDistance) {
-                // プレイヤーから門番猫への方向ベクトル
-                const toGateKeeper = new THREE.Vector3()
-                    .subVectors(this.gateKeeperPosition, this.player.position)
-                    .normalize();
-                
-                // 前方方向との内積を計算（前方にいるかどうか）
-                const dotProduct = forwardDirection.dot(toGateKeeper);
-                
-                // 前方にいる場合のみ会話を開始（内積が0.5以上 = 約60度以内）
-                if (dotProduct > 0.5) {
-                    // 門番猫が失敗した場合は、一定時間は会話を開始しない
-                    if (this.lastFailedCatId === 'gate_keeper') {
-                        const timeSinceFailure = now - this.lastFailedTime;
-                        if (timeSinceFailure < 5000) {  // 失敗後5秒間は会話を開始しない
-                            return;
-                        }
+                // 門番猫が失敗した場合は、一定時間は会話を開始しない
+                if (this.lastFailedCatId === 'gate_keeper') {
+                    const timeSinceFailure = now - this.lastFailedTime;
+                    if (timeSinceFailure < 5000) {  // 失敗後5秒間は会話を開始しない
+                        return;
                     }
-                    this.checkGateKeeperInteraction();
-                    return;  // 門番猫との会話を優先
                 }
+                this.checkGateKeeperInteraction();
+                return;  // 門番猫との会話を優先
             }
         }
         
@@ -3034,30 +3014,19 @@ class Village3D {
             const distance = this.player.position.distanceTo(catObj.position);
             
             if (distance < this.interactionDistance) {
-                // プレイヤーから猫への方向ベクトル
-                const toCat = new THREE.Vector3()
-                    .subVectors(catObj.position, this.player.position)
-                    .normalize();
+                // 会話フラグを設定して重複を防ぐ
+                this.isDialogueActive = true;
+                this.lastInteractionTime = now;
                 
-                // 前方方向との内積を計算（前方にいるかどうか）
-                const dotProduct = forwardDirection.dot(toCat);
-                
-                // 前方にいる場合のみ会話を開始（内積が0.5以上 = 約60度以内）
-                if (dotProduct > 0.5) {
-                    // 会話フラグを設定して重複を防ぐ
-                    this.isDialogueActive = true;
-                    this.lastInteractionTime = now;
-                    
-                    // アニメーションを一時停止
-                    if (this.animationId) {
-                        cancelAnimationFrame(this.animationId);
-                        this.animationId = null;
-                    }
-                    
-                    // 猫に近づいたら会話を開始
-                    const hasEscaped = catObj.hasEscaped;
-                    this.game.startDialogue(catObj.data, hasEscaped);
+                // アニメーションを一時停止
+                if (this.animationId) {
+                    cancelAnimationFrame(this.animationId);
+                    this.animationId = null;
                 }
+                
+                // 猫に近づいたら会話を開始
+                const hasEscaped = catObj.hasEscaped;
+                this.game.startDialogue(catObj.data, hasEscaped);
             }
         });
     }
