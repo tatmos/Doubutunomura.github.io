@@ -22,6 +22,14 @@ class Game {
             speechEnabled: true
         };
         
+        // 会話進行状態管理
+        this.dialogueState = {
+            isSpeaking: false,
+            isPlayingNotes: false,
+            skipRequested: false,
+            currentSpeechPromise: null
+        };
+        
         // セーブデータを読み込み
         this.loadProgress();
         
@@ -157,6 +165,82 @@ class Game {
             this.toggleSpeech();
         });
         
+        // 会話画面のタッチ/クリックで進行
+        const dialogueBox = document.querySelector('.dialogue-box');
+        const dialogueText = this.elements.dialogueText;
+        
+        if (dialogueBox) {
+            // タッチイベント（iPad対応）
+            dialogueBox.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                this.skipDialogueStep();
+            });
+            
+            // クリックイベント（PC対応）
+            dialogueBox.addEventListener('click', (e) => {
+                // ボタンやキーボードのクリックは除外
+                if (e.target.closest('.dialogue-controls') || 
+                    e.target.closest('#piano-keyboard')) {
+                    return;
+                }
+                this.skipDialogueStep();
+            });
+        }
+        
+        if (dialogueText) {
+            // テキストエリアも同様に
+            dialogueText.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                this.skipDialogueStep();
+            });
+            
+            dialogueText.addEventListener('click', (e) => {
+                if (e.target.closest('.dialogue-controls') || 
+                    e.target.closest('#piano-keyboard')) {
+                    return;
+                }
+                this.skipDialogueStep();
+            });
+        }
+        
+        // 狼画面のタッチ/クリックで進行
+        const wolfDialogueBox = document.querySelector('.wolf-dialogue-box');
+        const wolfDialogueText = this.elements.wolfDialogueText;
+        
+        if (wolfDialogueBox) {
+            wolfDialogueBox.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                this.skipDialogueStep();
+            });
+            
+            wolfDialogueBox.addEventListener('click', (e) => {
+                if (e.target.closest('.dialogue-controls') || 
+                    e.target.closest('#wolf-piano-keyboard')) {
+                    return;
+                }
+                this.skipDialogueStep();
+            });
+        }
+        
+        if (wolfDialogueText) {
+            wolfDialogueText.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                this.skipDialogueStep();
+            });
+            
+            wolfDialogueText.addEventListener('click', (e) => {
+                if (e.target.closest('.dialogue-controls') || 
+                    e.target.closest('#wolf-piano-keyboard')) {
+                    return;
+                }
+                this.skipDialogueStep();
+            });
+        }
+        
         // キーボード入力
         document.addEventListener('keydown', (e) => {
             this.handleKeyboard(e);
@@ -175,7 +259,55 @@ class Game {
         if (this.state.speechEnabled) {
             // 括弧内のテキストを除去して読み上げ
             const cleanText = text.replace(/[\n]/g, '。').replace(/[（\(].*?[）\)]/g, '');
-            await audioSystem.speakAsCharacter(cleanText, characterType);
+            
+            // 会話画面の場合、スキップ機能を有効化
+            if (this.state.currentScreen === 'dialogue' || this.state.currentScreen === 'wolf') {
+                this.dialogueState.isSpeaking = true;
+                this.dialogueState.skipRequested = false;
+                
+                const speechPromise = audioSystem.speakAsCharacter(cleanText, characterType);
+                this.dialogueState.currentSpeechPromise = speechPromise;
+                
+                try {
+                    await speechPromise;
+                } catch (error) {
+                    console.log('音声読み上げがスキップされました');
+                }
+                
+                this.dialogueState.isSpeaking = false;
+                this.dialogueState.currentSpeechPromise = null;
+            } else {
+                await audioSystem.speakAsCharacter(cleanText, characterType);
+            }
+        }
+    }
+    
+    /**
+     * 会話の現在のステップをスキップ（音声読み上げ中または音符再生中）
+     */
+    skipDialogueStep() {
+        // 会話画面または狼画面でない場合は無視
+        if (this.state.currentScreen !== 'dialogue' && this.state.currentScreen !== 'wolf') {
+            return;
+        }
+        
+        // 音声読み上げ中の場合は停止
+        if (this.dialogueState.isSpeaking) {
+            this.dialogueState.skipRequested = true;
+            if (audioSystem && typeof audioSystem.stopSpeaking === 'function') {
+                audioSystem.stopSpeaking();
+            }
+            // 音声合成を停止（Web Speech APIの場合）
+            if (window.speechSynthesis) {
+                window.speechSynthesis.cancel();
+            }
+            this.dialogueState.isSpeaking = false;
+            this.dialogueState.currentSpeechPromise = null;
+        }
+        
+        // 音符再生中の場合はスキップフラグを立てる
+        if (this.dialogueState.isPlayingNotes) {
+            this.dialogueState.skipRequested = true;
         }
     }
     
@@ -871,6 +1003,12 @@ class Game {
     
     // ===== 対話 =====
     async startDialogue(character, isRetry = false) {
+        // 会話状態をリセット
+        this.dialogueState.isSpeaking = false;
+        this.dialogueState.isPlayingNotes = false;
+        this.dialogueState.skipRequested = false;
+        this.dialogueState.currentSpeechPromise = null;
+        
         // 3Dシーンのアニメーションを停止
         if (this.village3D) {
             this.village3D.isDialogueActive = true;
@@ -1111,6 +1249,8 @@ class Game {
         const character = this.state.currentCharacter;
         this.elements.animalNotes.innerHTML = '';
         this.state.isPlaying = true;
+        this.dialogueState.isPlayingNotes = true;
+        this.dialogueState.skipRequested = false;
         
         if (character.isTwin) {
             // 双子猫：2つのメロディを同時に再生
@@ -1126,6 +1266,16 @@ class Game {
             const isOctaveBounce = character.octaveBounce; // 音域跳ね（ウサギ猫など）
             
             for (let i = 0; i < this.state.targetNotes.length; i++) {
+                // スキップリクエストがある場合はループを抜ける
+                if (this.dialogueState.skipRequested) {
+                    // 残りの音符を即座に表示
+                    for (let j = i; j < this.state.targetNotes.length; j++) {
+                        const note = this.state.targetNotes[j];
+                        const bubble = this.createNoteBubble(note);
+                        this.elements.animalNotes.appendChild(bubble);
+                    }
+                    break;
+                }
                 const note = this.state.targetNotes[i];
                 const bubble = this.createNoteBubble(note);
                 this.elements.animalNotes.appendChild(bubble);
@@ -1199,11 +1349,17 @@ class Game {
                 }
                 
                 await audioSystem.playNote(note, noteDuration, character.type || 'cat', pan, octaveShift);
-                await this.delay(noteDelay);
+                
+                // スキップリクエストがある場合は待機をスキップ
+                if (!this.dialogueState.skipRequested) {
+                    await this.delay(noteDelay);
+                }
             }
         }
         
         this.state.isPlaying = false;
+        this.dialogueState.isPlayingNotes = false;
+        this.dialogueState.skipRequested = false;
     }
     
     async playTwinNotes() {
@@ -1896,7 +2052,40 @@ class Game {
     }
     
     delay(ms) {
-        return new Promise(resolve => setTimeout(resolve, ms));
+        return new Promise(resolve => {
+            // 会話画面でない場合は通常の遅延
+            if (!this.dialogueState || 
+                (this.state.currentScreen !== 'dialogue' && this.state.currentScreen !== 'wolf')) {
+                setTimeout(resolve, ms);
+                return;
+            }
+            
+            // 既にスキップリクエストがある場合は即座に完了
+            if (this.dialogueState.skipRequested) {
+                resolve();
+                return;
+            }
+            
+            // 50msごとにスキップリクエストをチェック
+            const checkInterval = 50;
+            let elapsed = 0;
+            
+            const checkSkip = () => {
+                if (this.dialogueState.skipRequested) {
+                    resolve();
+                    return;
+                }
+                
+                elapsed += checkInterval;
+                if (elapsed >= ms) {
+                    resolve();
+                } else {
+                    setTimeout(checkSkip, checkInterval);
+                }
+            };
+            
+            setTimeout(checkSkip, checkInterval);
+        });
     }
 }
 
@@ -2662,7 +2851,7 @@ class Village3D {
             
             let catGroup;
             try {
-                catGroup = await this.loadGLTFModel(`models/muraneko_${ Math.floor(Math.random() * 3) + 1}.glb`, {
+                catGroup = await this.loadGLTFModel(`models/muraneko_${ index % 3 + 1}.glb`, {
                     scale: 1.0,  // 猫のサイズに合わせて調整
                     position: { x: catPos.x, y: 0.5, z: catPos.z },
                     castShadow: true,
@@ -2782,7 +2971,8 @@ class Village3D {
                     const moveVector = new THREE.Vector3();
                     
                     // カメラの方向ではなく、固定方向で移動（上=前、下=後、左=左、右=右）
-                    const forward = -deltaY * 0.01;
+                    // キーボード操作と同じ方向に合わせる（上スワイプ=前に進む=Z軸が減る）
+                    const forward = deltaY * 0.01;
                     const right = deltaX * 0.01;
                     
                     // ワールド座標系での前後左右
