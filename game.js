@@ -609,7 +609,7 @@ class Game {
     }
     
     // ===== 村 =====
-    enterVillage() {
+    async enterVillage() {
         this.showScreen('village');
         
         const chapter = CHAPTERS[this.state.currentChapter];
@@ -659,9 +659,9 @@ class Game {
                 this.village3D = null;
             }
             
-            // 3D村を初期化
+            // 3D村を初期化（非同期）
             this.village3D = new Village3D(this.elements.village3DCanvas, this);
-            this.village3D.init(chapterData.cats, this.state.friends, this.state.escapedCats);
+            await this.village3D.init(chapterData.cats, this.state.friends, this.state.escapedCats);
         } catch (error) {
             console.error('3D村の初期化エラー:', error);
             console.error('エラースタック:', error.stack);
@@ -1633,7 +1633,7 @@ class Game {
         if (!this.forestPath3D) {
             this.forestPath3D = new ForestPath3D(this.elements.forestPathCanvas, this);
         }
-        this.forestPath3D.init();
+        await this.forestPath3D.init();
     }
     
     async startWolfBattle() {
@@ -1936,7 +1936,7 @@ class Village3D {
         this.lastFailedTime = 0;  // 最後に失敗した時間
     }
     
-    init(catsData, friends, escapedCats) {
+    async init(catsData, friends, escapedCats) {
         if (!this.canvas) {
             throw new Error('キャンバス要素が設定されていません');
         }
@@ -2000,8 +2000,8 @@ class Village3D {
             // 環境を作成（木、建物など）
             this.createEnvironment();
             
-            // プレイヤーを作成
-            this.createPlayer();
+            // プレイヤーを作成（非同期）
+            await this.createPlayer();
             
             // プレイヤーの初期位置を記録
             if (this.player) {
@@ -2596,16 +2596,30 @@ class Village3D {
         return tree;
     }
     
-    createPlayer() {
-        // プレイヤーをシンプルなキューブで表現
-        const geometry = new THREE.BoxGeometry(0.8, 1.6, 0.8);
-        const material = new THREE.MeshLambertMaterial({ color: 0x4a90c2 });
-        this.player = new THREE.Mesh(geometry, material);
+    async createPlayer() {
+        try {
+            const playerModel = await this.loadGLTFModel('models/player.glb', {
+                scale: 1.0,
+                position: { x: 0, y: 0, z: 0 },
+                castShadow: true,
+                receiveShadow: true,
+                playAnimation: true  // アニメーションがある場合
+            });
+            this.player = playerModel;
+            this.scene.add(this.player);
+        } catch (error) {
+            console.error('プレイヤーモデルの読み込みに失敗:', error);
+            // フォールバック：シンプルなキューブを使用
+            const geometry = new THREE.BoxGeometry(0.8, 1.6, 0.8);
+            const material = new THREE.MeshLambertMaterial({ color: 0x4a90c2 });
+            this.player = new THREE.Mesh(geometry, material);
+            this.scene.add(this.player);
+        }
+        
         this.player.position.set(0, 0.8, 0);
         this.player.castShadow = true;
-        this.scene.add(this.player);
         
-        // プレイヤーの上にマーカーを追加
+        // プレイヤーの上にマーカーを追加（モデルが読み込まれた場合も追加）
         const markerGeometry = new THREE.ConeGeometry(0.3, 0.5, 4);
         const markerMaterial = new THREE.MeshLambertMaterial({ color: 0xffd700 });
         const marker = new THREE.Mesh(markerGeometry, markerMaterial);
@@ -2627,6 +2641,30 @@ class Village3D {
             const hasEscaped = escapedCats.includes(cat.id);
             
             // 猫の3Dモデル（シンプルな球体 + テキスト）
+            // AI生成モデルを使用する場合は、以下のように読み込めます：
+            // 
+            // let catGroup;
+            // try {
+            //     catGroup = await this.loadGLTFModel(`models/cat_${cat.id}.glb`, {
+            //         scale: 0.5,  // 猫のサイズに合わせて調整
+            //         position: { x: catPos.x, y: 0.5, z: catPos.z },
+            //         castShadow: true,
+            //         receiveShadow: true,
+            //         playAnimation: true  // アニメーションがある場合（歩く、座るなど）
+            //     });
+            // } catch (error) {
+            //     console.error(`猫モデル(${cat.id})の読み込みに失敗:`, error);
+            //     // フォールバック：シンプルな球体を使用
+            //     catGroup = new THREE.Group();
+            //     const bodyGeometry = new THREE.SphereGeometry(0.5, 16, 16);
+            //     const bodyMaterial = new THREE.MeshLambertMaterial({ 
+            //         color: isFriend ? 0xffd700 : (hasEscaped ? 0x888888 : 0xffa500)
+            //     });
+            //     const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+            //     body.castShadow = true;
+            //     catGroup.add(body);
+            // }
+            
             const catGroup = new THREE.Group();
             
             // 猫の体
@@ -3044,6 +3082,11 @@ class Village3D {
         // 猫のアニメーション（上下に浮遊）
         this.cats.forEach(catObj => {
             if (catObj.mesh) {
+                // AI生成モデルのアニメーションを更新（GLTFアニメーションがある場合）
+                if (catObj.mesh.userData.mixer) {
+                    catObj.mesh.userData.mixer.update(0.016); // 約60fps想定
+                }
+                
                 // 仲間になった猫は追従中なので浮遊アニメーションは控えめに
                 if (catObj.isFriend) {
                     catObj.mesh.position.y = 0.5 + Math.sin(Date.now() * 0.001 + catObj.data.id.length) * 0.1;
@@ -3051,6 +3094,18 @@ class Village3D {
                     catObj.mesh.position.y = 0.5 + Math.sin(Date.now() * 0.001 + catObj.data.id.length) * 0.2;
                 }
                 catObj.mesh.rotation.y += 0.01;
+            }
+        });
+        
+        // プレイヤーモデルのアニメーションを更新（AI生成モデルの場合）
+        if (this.player && this.player.userData.mixer) {
+            this.player.userData.mixer.update(0.016);
+        }
+        
+        // シーン内のすべてのモデルのアニメーションを更新
+        this.scene.traverse((object) => {
+            if (object.userData && object.userData.mixer) {
+                object.userData.mixer.update(0.016);
             }
         });
         
@@ -3076,6 +3131,168 @@ class Village3D {
         if (!this.animationId && this.game.state.currentScreen === 'village') {
             this.animate();
         }
+    }
+    
+    /**
+     * AI生成モデルを読み込む（GLTF/GLB形式）
+     * @param {string} modelPath - モデルファイルのパス（例: 'models/cat.glb'）
+     * @param {Object} options - オプション（scale, position, rotationなど）
+     * @returns {Promise<THREE.Group>} 読み込まれたモデル
+     */
+    async loadGLTFModel(modelPath, options = {}) {
+        return new Promise((resolve, reject) => {
+            if (typeof THREE.GLTFLoader === 'undefined') {
+                reject(new Error('GLTFLoaderが読み込まれていません'));
+                return;
+            }
+            
+            const loader = new THREE.GLTFLoader();
+            loader.load(
+                modelPath,
+                (gltf) => {
+                    const model = gltf.scene;
+                    
+                    // スケール設定
+                    if (options.scale) {
+                        if (typeof options.scale === 'number') {
+                            model.scale.set(options.scale, options.scale, options.scale);
+                        } else {
+                            model.scale.set(options.scale.x || 1, options.scale.y || 1, options.scale.z || 1);
+                        }
+                    }
+                    
+                    // 位置設定
+                    if (options.position) {
+                        model.position.set(
+                            options.position.x || 0,
+                            options.position.y || 0,
+                            options.position.z || 0
+                        );
+                    }
+                    
+                    // 回転設定
+                    if (options.rotation) {
+                        model.rotation.set(
+                            options.rotation.x || 0,
+                            options.rotation.y || 0,
+                            options.rotation.z || 0
+                        );
+                    }
+                    
+                    // アニメーションがある場合は再生
+                    if (gltf.animations && gltf.animations.length > 0 && options.playAnimation !== false) {
+                        const mixer = new THREE.AnimationMixer(model);
+                        gltf.animations.forEach((clip) => {
+                            mixer.clipAction(clip).play();
+                        });
+                        model.userData.mixer = mixer; // 後で更新するために保存
+                    }
+                    
+                    // 影の設定
+                    model.traverse((child) => {
+                        if (child.isMesh) {
+                            child.castShadow = options.castShadow !== false;
+                            child.receiveShadow = options.receiveShadow !== false;
+                        }
+                    });
+                    
+                    resolve(model);
+                },
+                (progress) => {
+                    // 読み込み進捗（オプション）
+                    if (options.onProgress) {
+                        options.onProgress(progress);
+                    }
+                },
+                (error) => {
+                    console.error('GLTFモデルの読み込みエラー:', error);
+                    reject(error);
+                }
+            );
+        });
+    }
+    
+    /**
+     * AI生成モデルを読み込む（OBJ形式）
+     * @param {string} modelPath - モデルファイルのパス（例: 'models/cat.obj'）
+     * @param {string} materialPath - マテリアルファイルのパス（.mtl、オプション）
+     * @param {Object} options - オプション（scale, position, rotationなど）
+     * @returns {Promise<THREE.Group>} 読み込まれたモデル
+     */
+    async loadOBJModel(modelPath, materialPath = null, options = {}) {
+        return new Promise((resolve, reject) => {
+            if (typeof THREE.OBJLoader === 'undefined') {
+                reject(new Error('OBJLoaderが読み込まれていません'));
+                return;
+            }
+            
+            const objLoader = new THREE.OBJLoader();
+            
+            // マテリアルがある場合は先に読み込む
+            if (materialPath && typeof THREE.MTLLoader !== 'undefined') {
+                const mtlLoader = new THREE.MTLLoader();
+                mtlLoader.load(materialPath, (materials) => {
+                    materials.preload();
+                    objLoader.setMaterials(materials);
+                    loadOBJ();
+                });
+            } else {
+                loadOBJ();
+            }
+            
+            function loadOBJ() {
+                objLoader.load(
+                    modelPath,
+                    (object) => {
+                        // スケール設定
+                        if (options.scale) {
+                            if (typeof options.scale === 'number') {
+                                object.scale.set(options.scale, options.scale, options.scale);
+                            } else {
+                                object.scale.set(options.scale.x || 1, options.scale.y || 1, options.scale.z || 1);
+                            }
+                        }
+                        
+                        // 位置設定
+                        if (options.position) {
+                            object.position.set(
+                                options.position.x || 0,
+                                options.position.y || 0,
+                                options.position.z || 0
+                            );
+                        }
+                        
+                        // 回転設定
+                        if (options.rotation) {
+                            object.rotation.set(
+                                options.rotation.x || 0,
+                                options.rotation.y || 0,
+                                options.rotation.z || 0
+                            );
+                        }
+                        
+                        // 影の設定
+                        object.traverse((child) => {
+                            if (child.isMesh) {
+                                child.castShadow = options.castShadow !== false;
+                                child.receiveShadow = options.receiveShadow !== false;
+                            }
+                        });
+                        
+                        resolve(object);
+                    },
+                    (progress) => {
+                        if (options.onProgress) {
+                            options.onProgress(progress);
+                        }
+                    },
+                    (error) => {
+                        console.error('OBJモデルの読み込みエラー:', error);
+                        reject(error);
+                    }
+                );
+            }
+        });
     }
     
     destroy() {
@@ -3154,7 +3371,7 @@ class ForestPath3D {
         this.playerPosition = 0;  // プレイヤーの位置（道の始まりから）
     }
     
-    init() {
+    async init() {
         if (!this.canvas) {
             throw new Error('キャンバス要素が設定されていません');
         }
