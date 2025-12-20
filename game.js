@@ -2614,6 +2614,8 @@ class Village3D {
             const material = new THREE.MeshLambertMaterial({ color: 0x4a90c2 });
             this.player = new THREE.Mesh(geometry, material);
             this.scene.add(this.player);
+            // フォールバックモデルも右に90度回転
+            this.player.rotation.y = Math.PI / 2;
         }
         
         this.player.position.set(0, 0.8, 0);
@@ -2787,8 +2789,15 @@ class Village3D {
                     moveVector.z = forward;  // 前後（Z軸）
                     moveVector.x = right;    // 左右（X軸）
                     
-                    if (this.player) {
+                    if (this.player && moveVector.length() > 0) {
+                        // プレイヤーの位置を更新前に記録（猫の追従計算用）
+                        this.playerLastPosition.copy(this.player.position);
                         this.player.position.add(moveVector);
+                        
+                        // 移動方向にプレイヤーを向ける
+                        const angle = Math.atan2(moveVector.x, moveVector.z);
+                        this.player.rotation.y = angle;
+                        
                         const boundary = 20;
                         this.player.position.x = Math.max(-boundary, Math.min(boundary, this.player.position.x));
                         this.player.position.z = Math.max(-boundary, Math.min(boundary, this.player.position.z));
@@ -2840,11 +2849,15 @@ class Village3D {
         const lastPos = this.playerLastPosition.clone();
         lastPos.y = 0.5;
         const moveDirection = playerPos.clone().sub(lastPos);
+        const isPlayerMoving = moveDirection.length() > 0.01;  // プレイヤーが移動しているか
+        
         let followDirection = new THREE.Vector3(0, 0, -1);  // デフォルトは後ろ方向
         
-        if (moveDirection.length() > 0.01) {
+        if (isPlayerMoving) {
             // 移動している場合は、移動方向の逆方向（後ろ）を計算
             followDirection = moveDirection.clone().normalize().multiplyScalar(-1);
+        } else {
+            return;
         }
         
         // 各猫が前の位置を追従
@@ -2884,8 +2897,11 @@ class Village3D {
             const direction = targetPosition.clone().sub(currentPos);
             const distance = direction.length();
             
-            // 常に目標位置に向かって移動（距離が0.05より大きい場合）
-            if (distance > 0.05) {
+            // プレイヤーが止まっている時は、猫も目標位置に到達したら止まる
+            // プレイヤーが動いている時は、猫も追従し続ける
+            const stopThreshold = isPlayerMoving ? 0.05 : 0.1;  // 止まっている時は少し大きめの閾値
+            
+            if (distance > stopThreshold) {
                 // 目標位置に近づく
                 direction.normalize();
                 // 距離に応じて速度を調整（遠いほど速く）
@@ -2937,6 +2953,12 @@ class Village3D {
             // プレイヤーの位置を更新前に記録（猫の追従計算用）
             this.playerLastPosition.copy(this.player.position);
             this.player.position.add(moveVector);
+            
+            // 移動方向にプレイヤーを向ける
+            // Three.jsでは、rotation.yが水平面での向き（0が-Z方向、Math.PI/2が-X方向）
+            // atan2(x, z)で移動方向の角度を計算
+            const angle = Math.atan2(moveVector.x, moveVector.z);
+            this.player.rotation.y = angle;
         }
         
         // 境界チェック
@@ -2962,19 +2984,39 @@ class Village3D {
             return;
         }
         
-        // 門番猫との距離をチェック
+        // プレイヤーの前方方向を計算（rotation.yから）
+        // Three.jsでは、rotation.yが0の時は-Z方向（前）を向いている
+        const playerRotation = this.player.rotation.y;
+        const forwardDirection = new THREE.Vector3(
+            Math.sin(playerRotation),
+            0,
+            Math.cos(playerRotation)
+        );
+        
+        // 門番猫との距離と方向をチェック
         if (this.gateKeeperPosition) {
             const gateDistance = this.player.position.distanceTo(this.gateKeeperPosition);
             if (gateDistance < this.interactionDistance) {
-                // 門番猫が失敗した場合は、一定時間は会話を開始しない
-                if (this.lastFailedCatId === 'gate_keeper') {
-                    const timeSinceFailure = now - this.lastFailedTime;
-                    if (timeSinceFailure < 5000) {  // 失敗後5秒間は会話を開始しない
-                        return;
+                // プレイヤーから門番猫への方向ベクトル
+                const toGateKeeper = new THREE.Vector3()
+                    .subVectors(this.gateKeeperPosition, this.player.position)
+                    .normalize();
+                
+                // 前方方向との内積を計算（前方にいるかどうか）
+                const dotProduct = forwardDirection.dot(toGateKeeper);
+                
+                // 前方にいる場合のみ会話を開始（内積が0.5以上 = 約60度以内）
+                if (dotProduct > 0.5) {
+                    // 門番猫が失敗した場合は、一定時間は会話を開始しない
+                    if (this.lastFailedCatId === 'gate_keeper') {
+                        const timeSinceFailure = now - this.lastFailedTime;
+                        if (timeSinceFailure < 5000) {  // 失敗後5秒間は会話を開始しない
+                            return;
+                        }
                     }
+                    this.checkGateKeeperInteraction();
+                    return;  // 門番猫との会話を優先
                 }
-                this.checkGateKeeperInteraction();
-                return;  // 門番猫との会話を優先
             }
         }
         
@@ -2992,19 +3034,30 @@ class Village3D {
             const distance = this.player.position.distanceTo(catObj.position);
             
             if (distance < this.interactionDistance) {
-                // 会話フラグを設定して重複を防ぐ
-                this.isDialogueActive = true;
-                this.lastInteractionTime = now;
+                // プレイヤーから猫への方向ベクトル
+                const toCat = new THREE.Vector3()
+                    .subVectors(catObj.position, this.player.position)
+                    .normalize();
                 
-                // アニメーションを一時停止
-                if (this.animationId) {
-                    cancelAnimationFrame(this.animationId);
-                    this.animationId = null;
+                // 前方方向との内積を計算（前方にいるかどうか）
+                const dotProduct = forwardDirection.dot(toCat);
+                
+                // 前方にいる場合のみ会話を開始（内積が0.5以上 = 約60度以内）
+                if (dotProduct > 0.5) {
+                    // 会話フラグを設定して重複を防ぐ
+                    this.isDialogueActive = true;
+                    this.lastInteractionTime = now;
+                    
+                    // アニメーションを一時停止
+                    if (this.animationId) {
+                        cancelAnimationFrame(this.animationId);
+                        this.animationId = null;
+                    }
+                    
+                    // 猫に近づいたら会話を開始
+                    const hasEscaped = catObj.hasEscaped;
+                    this.game.startDialogue(catObj.data, hasEscaped);
                 }
-                
-                // 猫に近づいたら会話を開始
-                const hasEscaped = catObj.hasEscaped;
-                this.game.startDialogue(catObj.data, hasEscaped);
             }
         });
     }
