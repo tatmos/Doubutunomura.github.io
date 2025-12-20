@@ -3146,10 +3146,19 @@ class Village3D {
                 return;
             }
             
+            // ファイルの存在確認（オプション）
+            const fullPath = modelPath.startsWith('http') ? modelPath : 
+                             (modelPath.startsWith('/') ? modelPath : `/${modelPath}`);
+            
+            console.log(`モデルを読み込み中: ${fullPath}`);
+            
             const loader = new THREE.GLTFLoader();
+            
+            // エラーハンドリングを改善
             loader.load(
                 modelPath,
                 (gltf) => {
+                    console.log(`モデルの読み込み成功: ${modelPath}`);
                     const model = gltf.scene;
                     
                     // スケール設定
@@ -3203,10 +3212,30 @@ class Village3D {
                     if (options.onProgress) {
                         options.onProgress(progress);
                     }
+                    if (progress.lengthComputable) {
+                        const percentComplete = (progress.loaded / progress.total) * 100;
+                        console.log(`モデル読み込み進捗: ${percentComplete.toFixed(2)}%`);
+                    }
                 },
                 (error) => {
                     console.error('GLTFモデルの読み込みエラー:', error);
-                    reject(error);
+                    console.error('モデルパス:', modelPath);
+                    console.error('現在のURL:', window.location.href);
+                    
+                    // より詳細なエラーメッセージ
+                    let errorMessage = `モデルファイルの読み込みに失敗しました: ${modelPath}`;
+                    
+                    if (error.message && error.message.includes('JSON')) {
+                        errorMessage += '\nファイルが見つからないか、サーバーが正しく起動していない可能性があります。';
+                        errorMessage += '\n確認事項:';
+                        errorMessage += '\n1. ファイルが存在するか確認: ' + modelPath;
+                        errorMessage += '\n2. ローカルサーバーが起動しているか確認（http://localhost:...）';
+                        errorMessage += '\n3. ブラウザのコンソールでネットワークタブを確認';
+                    }
+                    
+                    const detailedError = new Error(errorMessage);
+                    detailedError.originalError = error;
+                    reject(detailedError);
                 }
             );
         });
